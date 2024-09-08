@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Log In
+{% endblock %}
+
+{% block main %}
+    <div class="container d-flex justify-content-center">
+        <div class="border border-primary rounded p-4" style="max-width: 400px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);">
+            <p>Enter your username and password to log in</p>
+            <form action="/login" method="post" style="padding-bottom: 10px;">
+                <div class="mb-3">
+                    <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="username" placeholder="Username" type="text">
+                </div>
+                <div class="mb-3">
+                    <input class="form-control mx-auto w-auto" name="password" placeholder="Password" type="password">
+                </div>
+                <button class="btn btn-primary w-50" type="submit">Log In</button>
+            </form>
+            <a href="/register" class="btn btn-primary w-50">Register</a>
+        </div>
+    </div>
+{% endblock %}

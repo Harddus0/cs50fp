@@ -1,0 +1,6 @@
+.center {
+    text-align: center;
+}
+body {
+    padding-top: 70px; /* Same height as the fixed navbar */
+}
