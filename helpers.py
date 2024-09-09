@@ -23,3 +23,13 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
+
+# Fetch all projects for the logged-in user
+def get_user_projects():
+    cur = get_db().cursor()
+    user_id = session.get("user_id")
+    projects = cur.execute("SELECT name FROM projects WHERE user_id = ?", (user_id,)).fetchall()
+    cur.close()
+
+    # Return project names as a list
+    return [project["name"] for project in projects]

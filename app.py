@@ -1,4 +1,4 @@
-from helpers import get_db, close_db, login_required
+from helpers import get_db, close_db, login_required, get_user_projects
 from flask import Flask, flash, redirect, render_template, request, session, url_for, g
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
@@ -46,11 +46,44 @@ def login():
         # Store user ID in session to log them in
         session["user_id"] = rows[0]["id"]
         cur.close()
-        flash("You are logged in","success")
+        # flash("You are logged in","success")
         return redirect("/")
 
     # GET method
     return render_template("login.html")
+
+
+@app.route("/project", methods=["GET", "POST"])
+@login_required
+def project():
+    
+    if request.method == "POST":
+        cur = get_db().cursor()
+
+        selected_project = request.form.get("selected_project")
+        
+        if selected_project:
+            session["project_id"] = cur.execute(
+                "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+                (session.get("user_id"), selected_project)
+            ).fetchone()[0]
+            return render_template("index.html", selected_project=selected_project)
+
+        project = request.form.get("project")
+
+        if not project:
+            flash("Project name required", "error")
+            return render_template("project.html")
+
+        cur.execute("INSERT INTO projects (user_id, name) VALUES (?, ?)", (session.get("user_id"), project))
+
+        g.db.commit()
+        cur.close()
+
+        flash("Project successfully created!","success")
+        return render_template("project.html", projects=get_user_projects())
+
+    return render_template("project.html", projects=get_user_projects())
 
 
 
@@ -100,7 +133,7 @@ def register():
 
 
         # Redirect user to home page for login once registration completes
-        flash("Registration successful","success")
+        # flash("Registration successful","success")
         return redirect("/login")
 
     # GET method
@@ -110,7 +143,7 @@ def register():
 @app.route("/logout", methods=["GET"])
 def logout():
     session.clear()
-    redirect("/")
+    return redirect("/")
 
 
 if __name__ == "__main__":

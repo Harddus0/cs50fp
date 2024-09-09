@@ -34,7 +34,17 @@
                     <ul class="navbar-nav ms-auto mt-2">
 
                         {% if session["user_id"] %}
-                            <li class="nav-item active"><a href="/#" class="nav-link">Projects</a></li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="projectDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Select Project
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="projectDropdown">
+                                    {% for project in projects %}
+                                        <li><a class="dropdown-item" href="#" onclick="selectProject('{{ project }}')">{{ project }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            <li class="nav-item active"><a href="/logout" class="nav-link">Log Out</a></li>
                             
                         {% else %}
                             <li class="nav-item active"><a href="/login" class="nav-link">Login</a></li>
@@ -53,7 +63,6 @@
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
-                        
                     {% endfor %}
                 </div>
             {% endif %}
