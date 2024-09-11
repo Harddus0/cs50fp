@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import timedelta, datetime
 from flask import g, session, redirect, url_for
 from functools import wraps
 
@@ -64,3 +65,77 @@ def get_project_wbs():
     
     # Return the WBS as a list of dictionaries
     return wbs_table
+
+
+def calculate_dates():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+
+    # Fetch project start date
+    project_start_date =  cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+
+    # Get the number of locations
+    locations_count = cur.execute("SELECT display_id FROM lbs WHERE project_id = ? ORDER BY id DESC LIMIT 1", (project_id,)).fetchone()[0]
+    
+    # Fetch WBS table with tasks and possible predecessors
+    wbs_table = cur.execute(
+        """
+        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.display_id, wbs.task, wbs.duration
+        ORDER BY wbs.display_id
+        """,
+        (project_id,)
+    ).fetchall()
+
+    for task in wbs_table:
+        task_id = task["id"]
+        predecessors = task["predecessors"]
+
+        # set start time as project_start_date for first iteration
+        if not predecessors:
+            start_time = datetime.strptime(project_start_date,"%Y-%m-%d")
+            end_time = start_time + timedelta(days=task["duration"] * locations_count)
+            cur.execute("UPDATE wbs SET start_time = ?, end_time = ? WHERE id = ?", (start_time,end_time,task_id))
+            g.db.commit()
+        else:
+            # get task predecessor of highest duration, extracting both the highest duration (max_dur) and the predecessor end_date
+            predecessor_durations = cur.execute(
+                """
+                SELECT wbs.duration, wbs.start_time, wbs.end_time
+                FROM wbs
+                JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+                WHERE wbs.project_id = ? AND wbs.id = ?
+                """,
+            (project_id,task_id)
+            ).fetchall()
+            
+            predecessor_max_duration = 0
+            
+            for row in predecessor_durations:
+                if predecessor_max_duration < row["duration"]:
+                    predecessor_end_time = row["end_time"]
+                    predecessor_max_duration = row["duration"]
+
+            # Use Line of Balance logic to calculate dates
+            if predecessor_max_duration <= task["duration"]:
+                # Case where predecessor's duration is smaller or equal to current task's duration
+                start_time = datetime.strptime(predecessor_end_time,"%Y-%m-%d %H:%M:%S")
+                end_time = start_time + timedelta(days=task["duration"] * locations_count)
+            else:
+                # Case where predecessor's duration is larger than the current task's duration
+                end_time = datetime.strptime(predecessor_end_time,"%Y-%m-%d %H:%M:%S") + timedelta(days=task["duration"])
+                start_time = end_time - timedelta(days=task["duration"] * (locations_count - 1))
+
+        # Update the WBS table with calculated start and end times
+        cur.execute(
+            "UPDATE wbs SET start_time = ?, end_time = ? WHERE id = ?", 
+            (start_time, end_time, task_id)
+        )
+        get_db().commit()
+
+    
+    cur.close()

@@ -16,7 +16,7 @@
                 <th>Task</th>
                 <th>Duration</th>
                 <th>Predecessor</th>
-                <th></th>
+                <th></th> <!-- Add/Delete column -->
             </tr>
         </thead>
         
@@ -24,11 +24,10 @@
 
             <tr>
                 <form method="POST" action="/task">
-                    <td></td> <!-- id row doesn't take input -->
+                    <td></td> <!-- id takes no input -->
                     <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="task" placeholder="Task Name" type="text"></td>
                     <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="duration" placeholder="Duration (Days)" type="text"></td>
                     <td>
-
                         <select class="form-select mx-auto w-auto select-small" aria-label="Default select example" name="predecessor" multiple>
                             <option value=None>None</option>
                             {% for row in wbs_table %}

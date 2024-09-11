@@ -1,4 +1,4 @@
-from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs
+from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_dates
 from flask import Flask, flash, redirect, render_template, request, session, url_for, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
@@ -70,12 +70,17 @@ def project():
             return render_template("index.html", selected_project=selected_project)
 
         project = request.form.get("project")
+        start_date = request.form.get("start_date")
 
         if not project:
             flash("Project name required", "error")
-            return render_template("project.html")
+            return render_template("project.html", projects=get_user_projects())
+        
+        if not start_date:
+            flash("Project Start Date required", "error")
+            return render_template("project.html", projects=get_user_projects())
 
-        cur.execute("INSERT INTO projects (user_id, name) VALUES (?, ?)", (session.get("user_id"), project))
+        cur.execute("INSERT INTO projects (user_id, name, start_date) VALUES (?, ?, ?)", (session.get("user_id"), project, start_date))
 
         g.db.commit()
         cur.close()
@@ -226,6 +231,39 @@ def task():
     
     return render_template("task.html",wbs_table=get_project_wbs())
 
+
+@app.route("/lob")
+@login_required  # Protect this route so only logged-in users can access it
+def lob_data():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    calculate_dates()
+    
+    # Query to get the tasks and their start/end times across different locations
+    data = cur.execute(
+        """
+        SELECT wbs.task, wbs.start_time, wbs.end_time, lbs.location, lbs.display_id
+        FROM wbs
+        JOIN wbs_lbs ON wbs.id = wbs_lbs.wbs_id
+        JOIN lbs ON lbs.id = wbs_lbs.lbs_id
+        WHERE wbs.project_id = ?
+        ORDER BY wbs.display_id, lbs.display_id;
+        """, 
+        (project_id,)
+    ).fetchall()
+    
+    # Prepare data in JSON format
+    lob_data = []
+    for row in data:
+        lob_data.append({
+            "task": row["task"],
+            "start_time": row["start_time"],
+            "end_time": row["end_time"],
+            "location": row["location"],
+            "location_order": row["display_id"]
+        })
+    
+    return jsonify(lob_data)
 
 
 @app.route("/logout", methods=["GET"])

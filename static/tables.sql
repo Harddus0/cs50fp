@@ -8,6 +8,7 @@ CREATE TABLE users (
 CREATE TABLE projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     user_id INTEGER NOT NULL,
+    start_date DATE,
     name TEXT NOT NULL,
     creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -22,7 +23,6 @@ CREATE TABLE lbs (
     UNIQUE (project_id, location)  -- Ensures that each location is unique within a project
 );
 
--- wbs join attempt
 CREATE TABLE wbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     display_id INTEGER NOT NULL,
@@ -41,26 +41,6 @@ CREATE TABLE wbs_predecessors (
     PRIMARY KEY (task_id, predecessor_id),
     FOREIGN KEY (task_id) REFERENCES wbs(id) ON DELETE CASCADE,
     FOREIGN KEY (predecessor_id) REFERENCES wbs(id) ON DELETE CASCADE
-);
--- wbs join attempt
-
-
-
-
-
-
-
-
-CREATE TABLE wbs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    display_id INTEGER NOT NULL,
-    project_id INTEGER NOT NULL,
-    predecessor INTEGER,  -- Can be NULL if no predecessor
-    name TEXT NOT NULL,
-    start_time TIMESTAMP NOT NULL,
-    end_time TIMESTAMP NOT NULL,
-    FOREIGN KEY (predecessor) REFERENCES wbs(id),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 CREATE TABLE wbs_lbs (
