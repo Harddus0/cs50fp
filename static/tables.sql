@@ -15,9 +15,9 @@ CREATE TABLE projects (
 
 CREATE TABLE lbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    display_id INTEGER NOT NULL,
     project_id INTEGER NOT NULL,
     location TEXT NOT NULL,
-    above TEXT,  -- Refers to the parent location name instead of ID
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     UNIQUE (project_id, location)  -- Ensures that each location is unique within a project
 );
@@ -25,12 +25,14 @@ CREATE TABLE lbs (
 -- wbs join attempt
 CREATE TABLE wbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    display_id INTEGER NOT NULL,
     project_id INTEGER NOT NULL,
     task TEXT NOT NULL,
     duration FLOAT,  -- Number of days for the task execution
     start_time TIMESTAMP,  -- Calculated in backend, defaults to project start date
     end_time TIMESTAMP,  -- Calculated using CPM logic
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    UNIQUE (project_id, task)
 );
 
 CREATE TABLE wbs_predecessors (
@@ -51,6 +53,7 @@ CREATE TABLE wbs_predecessors (
 
 CREATE TABLE wbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    display_id INTEGER NOT NULL,
     project_id INTEGER NOT NULL,
     predecessor INTEGER,  -- Can be NULL if no predecessor
     name TEXT NOT NULL,

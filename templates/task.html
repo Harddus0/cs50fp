@@ -7,51 +7,56 @@
 {% block main %}
 <div class="container"></div>
     <h3>Create your Work Breakdown Structure </h3>
-    <!-- Table to display added locations -->
-    <table class="table table-striped" id="locations-table">
+
+    <!-- Table to display added tasks -->
+    <table class="table table-striped" id="wbs-table">
         <thead>
             <tr>
+                <TH>id</TH>
                 <th>Task</th>
                 <th>Duration</th>
                 <th>Predecessor</th>
+                <th></th>
             </tr>
         </thead>
         
-        <tbody id="locations-tbody">
-            <!-- Dynamically added rows will appear here -->
+        <tbody id="wbs-tbody">
+
             <tr>
                 <form method="POST" action="/task">
-                    <td><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="task" placeholder="Task Name" type="text"></td>
-                    <td><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="duration" placeholder="Duration (Days)" type="text"></td>
+                    <td></td> <!-- id row doesn't take input -->
+                    <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="task" placeholder="Task Name" type="text"></td>
+                    <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="duration" placeholder="Duration (Days)" type="text"></td>
                     <td>
-                        <select class="form-control mx-auto w-auto select-small" name="predecessor" multiple>
+
+                        <select class="form-select mx-auto w-auto select-small" aria-label="Default select example" name="predecessor" multiple>
+                            <option value=None>None</option>
                             {% for row in wbs_table %}
-                                <option value="{{ row['id'] }}">{{ row['task'] }}</option>
+                                <option value="{{ row['display_id'] }}">{{ row['display_id'] }}</option>
                             {% endfor %}
                         </select>
-                        
+
                     </td>
-                    <button class="btn btn-primary w-50" type="submit">Add Task</button>
+                    <td style="padding: 15px;"><button class="btn btn-primary mx-auto w-auto" type="submit">Add</button></td>
                 </form>
             </tr>
             {% for row in wbs_table %}
                 <tr>
+                    <td>{{ row["display_id"] }}</td>
                     <td>{{ row["task"] }}</td>
                     <td>{{ row["duration"] }}</td>
-                    <td>{{ row["predecessor"] }}</td>
+                    <td>{{ row["predecessors"] or none }}</td>
+                    <td>
+                        {% if loop.index == 1 %}
+                        <form method="POST" action="/task">
+                            <input type="hidden" name="id" value="{{ row['id'] }}">
+                            <button class="btn btn-danger mx-auto w-auto" type="submit">Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
-
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#predecessor-select').multiselect({
-            includeSelectAllOption: true,
-            enableFiltering: true,
-            buttonWidth: '100%'
-        });
-    });
-</script>
 
 {% endblock %}

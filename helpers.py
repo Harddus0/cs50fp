@@ -34,21 +34,33 @@ def get_user_projects():
     # Return project names as a list
     return [project["name"] for project in projects]
 
-# Fetch all projects for the selected project
+# Fetch all locations for the selected project
 def get_project_locations():
     cur = get_db().cursor()
     project_id = session.get("project_id")
-    locations = cur.execute("SELECT location, above FROM lbs WHERE project_id = ? ORDER BY id DESC", (project_id,)).fetchall()
+    locations = cur.execute("SELECT id, display_id, location FROM lbs WHERE project_id = ? ORDER BY id DESC", (project_id,)).fetchall()
     cur.close()
     
-    # Return project names as a list
+    # Return locations as a list of dictionaries
     return locations
 
+# Fetch Work Breakdown Structure for selected project
 def get_project_wbs():
     cur = get_db().cursor()
     project_id = session.get("project_id")
-    wbs_table = cur.execute("SELECT * FROM wbs WHERE project_id = ? ORDER BY id DESC", (project_id,)).fetchall()
+    wbs_table = cur.execute(
+        """
+        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.display_id, wbs.task, wbs.duration
+        ORDER BY wbs.display_id DESC
+        """,
+        (project_id,)
+    ).fetchall()
     cur.close()
     
-    # Return project names as a list
+    # Return the WBS as a list of dictionaries
     return wbs_table

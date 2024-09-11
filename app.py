@@ -143,22 +143,30 @@ def location():
         
         project_id = session.get("project_id")
         location = request.form.get("location")
-        above = request.form.get("above")
-      
+        delete_id = request.form.get("id")
+
+        if delete_id:
+            flash("Successfully deleted", "success")
+            cur.execute("DELETE FROM lbs WHERE id = ?", (delete_id,))
+            g.db.commit()
+            return render_template("location.html", lbs_table=get_project_locations())
+
         if not location:
             flash("location required", "error")
-            return render_template("location.html", location_table=get_project_locations())
+            return render_template("location.html", lbs_table=get_project_locations())
+        
+        max_id = cur.execute("SELECT IFNULL(MAX(display_id),0) FROM lbs WHERE project_id = ?", (project_id,)).fetchone()[0]
 
         try:
-            cur.execute("INSERT INTO lbs (project_id, location, above) VALUES (?, ?, ?)", (project_id, location, above))
+            cur.execute("INSERT INTO lbs (display_id, project_id, location) VALUES (?, ?, ?)", (max_id + 1, project_id, location))
             g.db.commit()
         except:
-            flash("try again", "error")
-            return render_template("location.html", location_table=get_project_locations())
+            flash("Please fill in the required fields", "error")
+            return render_template("location.html", lbs_table=get_project_locations())
 
-        return render_template("location.html", location_table=get_project_locations())
+        return render_template("location.html", lbs_table=get_project_locations())
 
-    return render_template("location.html", location_table=get_project_locations())
+    return render_template("location.html", lbs_table=get_project_locations())
 
 
 @app.route("/task", methods=["GET", "POST"])
@@ -170,17 +178,37 @@ def task():
 
         project_id = session.get("project_id")
         task_name = request.form.get("task")
-        duration = request.form.get("duration")
         predecessors = request.form.getlist("predecessor")
+        delete_id = request.form.get("id")
+
+        if delete_id:
+            flash("Successfully deleted", "success")
+            cur.execute("DELETE FROM wbs WHERE id = ?", (delete_id,))
+            cur.execute("DELETE FROM wbs_predecessors WHERE task_id = ?", (delete_id,))
+            g.db.commit()
+            return render_template("task.html", wbs_table=get_project_wbs())
+
+        try:
+            duration = float(request.form.get("duration"))
+        except:
+            flash("Please fill in the required fields", "error")
+            return render_template("task.html", wbs_table=get_project_wbs())
 
         if not task or not duration:
             flash("Please fill in the required fields", "error")
             return render_template("task.html", wbs_table=get_project_wbs())
     
-        cur.execute(
-            "INSERT INTO wbs (project_id, task, duration, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
-        (project_id, task_name, duration, None, None)
-        )
+
+        max_id = cur.execute("SELECT IFNULL(MAX(display_id),0) FROM wbs WHERE project_id = ?", (project_id,)).fetchone()[0]
+
+        try:
+            cur.execute(
+                "INSERT INTO wbs (display_id, project_id, task, duration, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
+            (max_id + 1, project_id, task_name, duration, None, None)
+            )
+        except:
+            flash("Insert an unique task", "error")
+            return render_template("task.html", wbs_table=get_project_wbs())
         
         # Get the inserted task's ID
         task_id = cur.lastrowid
@@ -197,11 +225,6 @@ def task():
         return render_template("task.html",wbs_table=get_project_wbs())
     
     return render_template("task.html",wbs_table=get_project_wbs())
-
-        
-
-
-
 
 
 

@@ -5,47 +5,40 @@
 {% endblock %}
 
 {% block main %}
-<!--
 
--->
+    <div class="container"></div>
+    <h3>Create your Location list</h3>
 
-<div class="container"></div>
-    <h3>Add Locations to Location Breakdown Structure</h3>
-    
-    <!-- Form to add new location -->
-    <div class="container d-flex justify-content-center">
-        <div class="border border-primary rounded p-2" style="max-width: 1000px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);">
-            
-            <form class="form-inline"action="/location" method="post">
-                <div>
-                    <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="location" placeholder="Location" type="text">
-                </div>
-                <div>
-                    <select class="form-select" style="margin-left: 5px;" name="above" id="above">
-                        <option value="" selected disabled>Above location</option>
-                        {% for row in location_table %}
-                            <option value="{{ row["location"] }}">{{ row["location"] }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button class="btn btn-primary w-10" type="submit" style="margin-left: 10px;">Submit</button>
-            </form>
-        </div>
-    </div> 
     <!-- Table to display added locations -->
     <table class="table table-striped" id="locations-table">
         <thead>
             <tr>
+                <Th>id</Th>
                 <th>Location</th>
-                <th>Above</th>
+                <th></th> <!-- Add/Delete column -->
             </tr>
         </thead>
+        
         <tbody id="locations-tbody">
-            <!-- Dynamically added rows will appear here -->
-            {% for row in location_table %}
+            <tr>
+                <form method="POST" action="/location">
+                    <td></td> <!-- id takes no input -->
+                    <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="location" placeholder="Location Name" type="text"></td>
+                    <td style="padding: 15px;"><button class="btn btn-primary mx-auto w-auto" type="submit">Add</button></td>
+                </form>
+            </tr>
+            {% for row in lbs_table %}
                 <tr>
+                    <td>{{ row["display_id"] }}</td>
                     <td>{{ row["location"] }}</td>
-                    <td>{{ row["above"] }}</td>
+                    <td>
+                        {% if loop.index == 1 %}
+                        <form method="POST" action="/location">
+                            <input type="hidden" name="id" value="{{ row['id'] }}">
+                            <button class="btn btn-danger mx-auto w-auto" type="submit">Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
