@@ -1,5 +1,5 @@
-from helpers import get_db, close_db, login_required, get_user_projects
-from flask import Flask, flash, redirect, render_template, request, session, url_for, g
+from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs
+from flask import Flask, flash, redirect, render_template, request, session, url_for, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 
@@ -86,13 +86,6 @@ def project():
     return render_template("project.html", projects=get_user_projects())
 
 
-
-@app.route("/dashboard")
-@login_required  # Protect this route so only logged-in users can access it
-def dashboard():
-    return render_template("dashboard.html")
-
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
     session.clear()
@@ -139,6 +132,78 @@ def register():
     # GET method
     return render_template("register.html")
     
+
+@app.route("/location", methods=["GET", "POST"])
+@login_required  # Protect this route so only logged-in users can access it
+def location():
+    
+    cur = get_db().cursor()
+
+    if request.method == "POST":
+        
+        project_id = session.get("project_id")
+        location = request.form.get("location")
+        above = request.form.get("above")
+      
+        if not location:
+            flash("location required", "error")
+            return render_template("location.html", location_table=get_project_locations())
+
+        try:
+            cur.execute("INSERT INTO lbs (project_id, location, above) VALUES (?, ?, ?)", (project_id, location, above))
+            g.db.commit()
+        except:
+            flash("try again", "error")
+            return render_template("location.html", location_table=get_project_locations())
+
+        return render_template("location.html", location_table=get_project_locations())
+
+    return render_template("location.html", location_table=get_project_locations())
+
+
+@app.route("/task", methods=["GET", "POST"])
+@login_required  # Protect this route so only logged-in users can access it
+def task():
+
+    if request.method == "POST":
+        cur = get_db().cursor()
+
+        project_id = session.get("project_id")
+        task_name = request.form.get("task")
+        duration = request.form.get("duration")
+        predecessors = request.form.getlist("predecessor")
+
+        if not task or not duration:
+            flash("Please fill in the required fields", "error")
+            return render_template("task.html", wbs_table=get_project_wbs())
+    
+        cur.execute(
+            "INSERT INTO wbs (project_id, task, duration, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
+        (project_id, task_name, duration, None, None)
+        )
+        
+        # Get the inserted task's ID
+        task_id = cur.lastrowid
+
+        # Insert into wbs_predecessors if predecessors were selected
+        for predecessor_id in predecessors:
+            cur.execute(
+                "INSERT INTO wbs_predecessors (task_id, predecessor_id) VALUES (?, ?)",
+                (task_id, predecessor_id)
+            )
+        g.db.commit()
+
+        flash("Task added successfully!", "success")
+        return render_template("task.html",wbs_table=get_project_wbs())
+    
+    return render_template("task.html",wbs_table=get_project_wbs())
+
+        
+
+
+
+
+
 
 @app.route("/logout", methods=["GET"])
 def logout():

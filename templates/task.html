@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Task
+{% endblock %}
+
+{% block main %}
+<div class="container"></div>
+    <h3>Create your Work Breakdown Structure </h3>
+    <!-- Table to display added locations -->
+    <table class="table table-striped" id="locations-table">
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th>Duration</th>
+                <th>Predecessor</th>
+            </tr>
+        </thead>
+        
+        <tbody id="locations-tbody">
+            <!-- Dynamically added rows will appear here -->
+            <tr>
+                <form method="POST" action="/task">
+                    <td><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="task" placeholder="Task Name" type="text"></td>
+                    <td><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="duration" placeholder="Duration (Days)" type="text"></td>
+                    <td>
+                        <select class="form-control mx-auto w-auto select-small" name="predecessor" multiple>
+                            {% for row in wbs_table %}
+                                <option value="{{ row['id'] }}">{{ row['task'] }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                    </td>
+                    <button class="btn btn-primary w-50" type="submit">Add Task</button>
+                </form>
+            </tr>
+            {% for row in wbs_table %}
+                <tr>
+                    <td>{{ row["task"] }}</td>
+                    <td>{{ row["duration"] }}</td>
+                    <td>{{ row["predecessor"] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        $('#predecessor-select').multiselect({
+            includeSelectAllOption: true,
+            enableFiltering: true,
+            buttonWidth: '100%'
+        });
+    });
+</script>
+
+{% endblock %}

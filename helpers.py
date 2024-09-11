@@ -33,3 +33,22 @@ def get_user_projects():
 
     # Return project names as a list
     return [project["name"] for project in projects]
+
+# Fetch all projects for the selected project
+def get_project_locations():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    locations = cur.execute("SELECT location, above FROM lbs WHERE project_id = ? ORDER BY id DESC", (project_id,)).fetchall()
+    cur.close()
+    
+    # Return project names as a list
+    return locations
+
+def get_project_wbs():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    wbs_table = cur.execute("SELECT * FROM wbs WHERE project_id = ? ORDER BY id DESC", (project_id,)).fetchall()
+    cur.close()
+    
+    # Return project names as a list
+    return wbs_table

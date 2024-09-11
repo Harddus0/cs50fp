@@ -17,31 +17,46 @@ CREATE TABLE lbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     project_id INTEGER NOT NULL,
     location TEXT NOT NULL,
-    above INTEGER,  -- Refers to the location id above, NULL if none
-    below INTEGER,  -- Refers to the location id below, NULL if none
-    location_level INTEGER NOT NULL,
+    above TEXT,  -- Refers to the parent location name instead of ID
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, location)  -- Ensures that each location is unique within a project
+);
+
+-- wbs join attempt
+CREATE TABLE wbs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    project_id INTEGER NOT NULL,
+    task TEXT NOT NULL,
+    duration FLOAT,  -- Number of days for the task execution
+    start_time TIMESTAMP,  -- Calculated in backend, defaults to project start date
+    end_time TIMESTAMP,  -- Calculated using CPM logic
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
-
-CREATE TABLE lbs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    location TEXT NOT NULL,
-    above INTEGER NOT NULL,
-    below INTEGER NOT NULL,
-    level INTEGER,
+CREATE TABLE wbs_predecessors (
+    task_id INTEGER NOT NULL,
+    predecessor_id INTEGER NOT NULL,
+    PRIMARY KEY (task_id, predecessor_id),
+    FOREIGN KEY (task_id) REFERENCES wbs(id) ON DELETE CASCADE,
+    FOREIGN KEY (predecessor_id) REFERENCES wbs(id) ON DELETE CASCADE
 );
+-- wbs join attempt
+
+
+
+
+
+
+
 
 CREATE TABLE wbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     project_id INTEGER NOT NULL,
     predecessor INTEGER,  -- Can be NULL if no predecessor
-    successor INTEGER,    -- Can be NULL if no successor
     name TEXT NOT NULL,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
     FOREIGN KEY (predecessor) REFERENCES wbs(id),
-    FOREIGN KEY (successor) REFERENCES wbs(id),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 

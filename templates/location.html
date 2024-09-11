@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Location
+{% endblock %}
+
+{% block main %}
+<!--
+
+-->
+
+<div class="container"></div>
+    <h3>Add Locations to Location Breakdown Structure</h3>
+    
+    <!-- Form to add new location -->
+    <div class="container d-flex justify-content-center">
+        <div class="border border-primary rounded p-2" style="max-width: 1000px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);">
+            
+            <form class="form-inline"action="/location" method="post">
+                <div>
+                    <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="location" placeholder="Location" type="text">
+                </div>
+                <div>
+                    <select class="form-select" style="margin-left: 5px;" name="above" id="above">
+                        <option value="" selected disabled>Above location</option>
+                        {% for row in location_table %}
+                            <option value="{{ row["location"] }}">{{ row["location"] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="btn btn-primary w-10" type="submit" style="margin-left: 10px;">Submit</button>
+            </form>
+        </div>
+    </div> 
+    <!-- Table to display added locations -->
+    <table class="table table-striped" id="locations-table">
+        <thead>
+            <tr>
+                <th>Location</th>
+                <th>Above</th>
+            </tr>
+        </thead>
+        <tbody id="locations-tbody">
+            <!-- Dynamically added rows will appear here -->
+            {% for row in location_table %}
+                <tr>
+                    <td>{{ row["location"] }}</td>
+                    <td>{{ row["above"] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+{% endblock %}

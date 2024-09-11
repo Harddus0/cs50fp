@@ -6,11 +6,16 @@
 
 {% block main %}
 
-<p>Welcome home</p>
+
 
 {% if selected_project is defined %}
-    <p>Project: {{ selected_project }}</p>
-    <p>Selected project: {{ x }}</p>
+    <h3>Project: {{ selected_project }}</h3>
+
+{% else %}
+
+    <h3>Select a Project to Continue</h3>
+
+
 {% endif %}
 
 {% endblock %}

@@ -1,6 +1,51 @@
 .center {
     text-align: center;
 }
+
 body {
-    padding-top: 70px; /* Same height as the fixed navbar */
+    padding-top: 64px; /* Same height as the fixed navbar */
+}
+
+.form-inline {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+  }
+
+.form-inline input {
+  vertical-align: middle;
+  margin: 5px 10px 5px 0;
+  padding: 10px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+}
+
+/* Style the submit button */
+.form-inline button {
+  padding: 10px 20px;
+  background-color: dodgerblue;
+  border: 1px solid #ddd;
+  color: white;
+}
+
+.form-inline button:hover {
+  background-color: royalblue;
+}
+
+@media (max-width: 800px) {
+    .form-inline input {
+        margin: 10px 0;
+    }
+
+    .form-inline {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.select-small {
+    padding: 4px 8px;
+    height: 30px; /* Adjust to your preferred height */
+    font-size: 14px; /* You can also reduce the font size if needed */
+    line-height: 1.5;
 }
