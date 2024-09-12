@@ -29,24 +29,27 @@ CREATE TABLE wbs (
     project_id INTEGER NOT NULL,
     task TEXT NOT NULL,
     duration FLOAT,  -- Number of days for the task execution
-    start_time TIMESTAMP,  -- Calculated in backend, defaults to project start date
-    end_time TIMESTAMP,  -- Calculated using CPM logic
+    start_time DATE,  -- Calculated in backend, defaults to project start date
+    end_time DATE,  -- Calculated using Line of Balance logic
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     UNIQUE (project_id, task)
 );
 
 CREATE TABLE wbs_predecessors (
     task_id INTEGER NOT NULL,
-    predecessor_id INTEGER NOT NULL,
+    predecessor_id INTEGER,
     PRIMARY KEY (task_id, predecessor_id),
     FOREIGN KEY (task_id) REFERENCES wbs(id) ON DELETE CASCADE,
     FOREIGN KEY (predecessor_id) REFERENCES wbs(id) ON DELETE CASCADE
 );
 
+-- For calculated for each location, this table must be created and the calcule_dates function updated
 CREATE TABLE wbs_lbs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     wbs_id INTEGER NOT NULL,
     lbs_id INTEGER NOT NULL,
-    PRIMARY KEY (wbs_id, lbs_id),
+    start_time DATE,
+    end_time DATE,
     FOREIGN KEY (wbs_id) REFERENCES wbs(id) ON DELETE CASCADE,
     FOREIGN KEY (lbs_id) REFERENCES lbs(id) ON DELETE CASCADE
 );

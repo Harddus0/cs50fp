@@ -1,88 +1,93 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Line of Balance</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <canvas id="lobChart" width="400" height="200"></canvas>
+{% extends "layout.html" %}
 
-    <script>
-        fetch('/lob')
-            .then(response => response.json())
-            .then(data => {
-                // Process the data to extract labels and datasets
-                let locations = [];
-                let tasks = {};
+{% block title %}
+    Line of Balance
+{% endblock %}
 
-                data.forEach(row => {
-                    if (!locations.includes(row.location)) {
-                        locations.push(row.location);
-                    }
+{% block main %}
+<div>
+    <canvas id="lobChart" width="800" height="400"></canvas>
+</div>
 
-                    if (!tasks[row.task]) {
-                        tasks[row.task] = {
-                            label: row.task,
-                            data: []
-                        };
-                    }
+<script>
+    // Fetch the LOB data from the Flask endpoint
+    fetch('/lob-data')
+        .then(response => response.json())
+        .then(data => {
+            console.log(data); // This will help you see the fetched data in your browser's console for debugging
 
-                    // Push the corresponding start time and end time for the task at each location
-                    tasks[row.task].data.push({
-                        x: new Date(row.start_time),
-                        y: row.location_order
-                    });
-                    tasks[row.task].data.push({
-                        x: new Date(row.end_time),
-                        y: row.location_order
-                    });
+            if (data.length === 0) {
+                alert("No data available");
+                return;
+            }
+
+            // Prepare data for Chart.js
+            let locations = [];
+            let tasks = {};
+
+            data.forEach(row => {
+                if (!locations.includes(row.location)) {
+                    locations.push(row.location);
+                }
+
+                if (!tasks[row.task]) {
+                    tasks[row.task] = {
+                        label: row.task,
+                        data: []
+                    };
+                }
+
+                tasks[row.task].data.push({
+                    x: new Date(row.start_time),
+                    y: row.location_order
                 });
 
-                // Convert tasks object to datasets array
-                let datasets = Object.keys(tasks).map(task => tasks[task]);
-
-                const ctx = document.getElementById('lobChart').getContext('2d');
-                const lobChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: locations,
-                        datasets: datasets
-                    },
-                    options: {
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: {
-                                    unit: 'day'
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Date'
-                                }
-                            },
-                            y: {
-                                type: 'linear',
-                                title: {
-                                    display: true,
-                                    text: 'Location Order'
-                                }
-                            }
-                        },
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'top'
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
-                            }
-                        }
-                    }
+                tasks[row.task].data.push({
+                    x: new Date(row.end_time),
+                    y: row.location_order
                 });
             });
-    </script>
-</body>
-</html>
+
+            let datasets = Object.keys(tasks).map(task => tasks[task]);
+
+            const ctx = document.getElementById('lobChart').getContext('2d');
+            const lobChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Location Order'
+                            }
+                        }
+                    },
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        });
+</script>
+{% endblock %}

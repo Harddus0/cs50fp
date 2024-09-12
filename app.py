@@ -10,9 +10,8 @@ app.teardown_appcontext(close_db)
 
 @app.route("/")
 def index():
-    if "username" in session:
-        return redirect(url_for("dashboard"))
-    return render_template("index.html")
+    selected_project = request.form.get("selected_project")
+    return render_template("index.html", selected_project=selected_project)
 
     
 @app.route("/login", methods=["GET", "POST"])
@@ -183,8 +182,10 @@ def task():
 
         project_id = session.get("project_id")
         task_name = request.form.get("task")
-        predecessors = request.form.getlist("predecessor")
         delete_id = request.form.get("id")
+        predecessors = request.form.getlist("predecessor")  
+        
+
 
         if delete_id:
             flash("Successfully deleted", "success")
@@ -218,12 +219,13 @@ def task():
         # Get the inserted task's ID
         task_id = cur.lastrowid
 
-        # Insert into wbs_predecessors if predecessors were selected
+        # Insert into wbs_predecessors only if predecessors were selected (not "None")
         for predecessor_id in predecessors:
-            cur.execute(
-                "INSERT INTO wbs_predecessors (task_id, predecessor_id) VALUES (?, ?)",
-                (task_id, predecessor_id)
-            )
+            if predecessor_id != "":  # Only insert if a predecessor is selected
+                cur.execute(
+                    "INSERT INTO wbs_predecessors (task_id, predecessor_id) VALUES (?, ?)",
+                    (task_id, predecessor_id)
+                )
         g.db.commit()
 
         flash("Task added successfully!", "success")
@@ -232,27 +234,25 @@ def task():
     return render_template("task.html",wbs_table=get_project_wbs())
 
 
-@app.route("/lob")
-@login_required  # Protect this route so only logged-in users can access it
+@app.route("/lob-data")
 def lob_data():
     cur = get_db().cursor()
     project_id = session.get("project_id")
-    calculate_dates()
     
-    # Query to get the tasks and their start/end times across different locations
     data = cur.execute(
         """
         SELECT wbs.task, wbs.start_time, wbs.end_time, lbs.location, lbs.display_id
         FROM wbs
-        JOIN wbs_lbs ON wbs.id = wbs_lbs.wbs_id
-        JOIN lbs ON lbs.id = wbs_lbs.lbs_id
+        JOIN lbs ON wbs.project_id = lbs.project_id
         WHERE wbs.project_id = ?
-        ORDER BY wbs.display_id, lbs.display_id;
         """, 
         (project_id,)
     ).fetchall()
     
-    # Prepare data in JSON format
+    # If data is empty, print for debugging
+    if not data:
+        print("No data returned for project:", project_id)
+    
     lob_data = []
     for row in data:
         lob_data.append({
@@ -264,6 +264,12 @@ def lob_data():
         })
     
     return jsonify(lob_data)
+
+
+@app.route('/lob')
+def lob():
+    calculate_dates()
+    return render_template('lob.html')
 
 
 @app.route("/logout", methods=["GET"])

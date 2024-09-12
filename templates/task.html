@@ -29,7 +29,7 @@
                     <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="duration" placeholder="Duration (Days)" type="text"></td>
                     <td>
                         <select class="form-select mx-auto w-auto select-small" aria-label="Default select example" name="predecessor" multiple>
-                            <option value=None>None</option>
+                            <option value="">None</option>
                             {% for row in wbs_table %}
                                 <option value="{{ row['display_id'] }}">{{ row['display_id'] }}</option>
                             {% endfor %}
