@@ -28,10 +28,16 @@ CREATE TABLE wbs (
     display_id INTEGER NOT NULL,
     project_id INTEGER NOT NULL,
     task TEXT NOT NULL,
-    duration FLOAT,  -- Number of days for the task execution
-    start_time DATE,  -- Calculated in backend, defaults to project start date
-    end_time DATE,  -- Calculated using Line of Balance logic
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    duration FLOAT,  
+    start_time DATE,  
+    end_time DATE,  
+    ES DATE,
+    EF DATE,
+    LS DATE,
+    LF DATE,
+    slack FLOAT,
+    critical FLOAT,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     UNIQUE (project_id, task)
 );
 

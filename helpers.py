@@ -1,4 +1,5 @@
 import sqlite3
+import time
 from datetime import timedelta, datetime
 from flask import g, session, redirect, url_for
 from functools import wraps
@@ -68,56 +69,277 @@ def get_project_wbs():
     return wbs_table
 
 
-def topological_sort(tasks):
-    # Build the graph (adjacency list) and in-degree dictionary
-    graph = defaultdict(list)
-    in_degree = {task["id"]: 0 for task in tasks}
+def calculate_date_cpm():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
 
-    print("Graph just created:", graph)
-    print("in_degree just created:", in_degree)
+    project_start_date = 0
+    
+    # Fetch WBS table with tasks and predecessors
+    wbs_table = cur.execute(
+        """
+        SELECT wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.id
+        ORDER BY wbs.display_id
+        """,
+        (project_id,)
+    ).fetchall()
 
-    # Build the task graph based on predecessors
+    # Convert fetched table rows into a list of dictionaries
+    tasks = []
+    successors = defaultdict(list)  # Dictionary to track successors
+    for row in wbs_table:
+        task = {
+            "id": row["display_id"],
+            "duration": row["duration"],
+            "predecessors": row["predecessors"].split(",") if row["predecessors"] else [],
+            "ES": None,  # Earliest Start
+            "EF": None,  # Earliest Finish
+            "LS": float('inf'),  # Latest Start (initialize to "infinity")
+            "LF": float('inf'),  # Latest Finish (initialize to "infinity")
+            "Slack": float('inf'),  # Total Slack
+            "Critical": False,  # Whether the task is on the critical path
+            "successors": []  # Successors will be added later
+        }
+        tasks.append(task)
+
+        # Populate the successors dictionary
+        for predecessor_id in task["predecessors"]:
+            if predecessor_id:
+                successors[int(predecessor_id)].append(task["id"])
+
+    # Add successors to each task
     for task in tasks:
-        for predecessor in task["predecessors"]:
-            if predecessor:  # Avoid empty predecessors
-                graph[int(predecessor)].append(task["id"])
-                in_degree[task["id"]] += 1
+        task["successors"] = successors[task["id"]]
+    # Dictionary for easy lookup by task id
+    task_dict = {task["id"]: task for task in tasks}
 
-    print("Graph after iteration:", graph)
-    print("in_degree after iteration:", in_degree)
+    # Gets the number of changes necessary inside while loop
+    num = len(tasks)
 
-    # Queue to process tasks with no predecessors (in-degree == 0)
-    queue = deque([task["id"] for task in tasks if in_degree[task["id"]] == 0])
+    # Forward Pass: Calculate ES and EF
+    def forward_pass():
+        i = 0
+        while i < num:
+            for task in tasks:
 
-    print("queue:", queue)
+                if not task["predecessors"]:  # If no predecessors, start at project_start_date
+                    if task["ES"] is None:
+                        task["ES"] = project_start_date
+                        task["EF"] = task["ES"] + task["duration"]
+                        i += 1
+                else:
+                    max_ef = 0
+                    ready = True
+                    for predecessor_id in task["predecessors"]:
+                        pred = task_dict.get(int(predecessor_id))
+                        if pred and pred["EF"] is not None:
+                            max_ef = max(max_ef, pred["EF"])
+                        else:
+                            ready = False
+                    if ready and task["ES"] is None:  # Only update if all predecessors are calculated
+                        task["ES"] = max_ef
+                        task["EF"] = task["ES"] + task["duration"]
+                        i += 1
 
-    sorted_tasks = []
 
-    while queue:
-        current_task = queue.popleft()
-        sorted_tasks.append(current_task)
+    # Backward Pass: Calculate LS and LF
+    def backward_pass():
+        project_duration = 0 
+        for task in tasks: 
+            project_duration = max(project_duration, task["EF"])
+        
+        i = 0
+        while i < num:
+            for task in reversed(tasks):
+                if not task["successors"]:  # Tasks without successors get their LF from project_duration
+                    if task["LF"] == float('inf'):
+                        task["LF"] = project_duration
+                        task["LS"] = task["LF"] - task["duration"]
+                        i += 1
+                else:
+                    min_ls = float('inf')
+                    ready = True
+                    for successor_id in task["successors"]:
+                        succ = task_dict.get(int(successor_id))
+                        if succ and succ["LS"] != float('inf'):
+                            min_ls = min(min_ls, succ["LS"])
+                        else:
+                            ready = False
+                    if ready and task["LF"] == float('inf'):  # Only update if all successors are calculated
+                        task["LF"] = min_ls
+                        task["LS"] = task["LF"] - task["duration"]
+                        i += 1
 
-        for dependent_task in graph[current_task]:
-            in_degree[dependent_task] -= 1
-            if in_degree[dependent_task] == 0:
-                queue.append(dependent_task)
+    # Run Forward Pass to calculate ES and EF
+    forward_pass()
 
-    print("Sorted Tasks:", sorted_tasks)
-    print("All Tasks:", [task["id"] for task in tasks])
+    # Run Backward Pass to calculate LS and LF
+    backward_pass()
 
 
-    # If sorted_tasks does not include all tasks, there is a cyclic dependency
-    if len(sorted_tasks) != len(tasks):
-        raise ValueError("Cyclic dependency detected in tasks.")
+    # Calculate Total Slack and mark critical tasks
+    for task in tasks:
+        task["Slack"] = task["LS"] - task["ES"]
+        if task["Slack"] == 0:
+            task["Critical"] = True
 
-    # Ensure sorted_tasks includes all tasks (even those with no predecessors)
-    sorted_task_ids = [task["id"] for task in tasks]
-    for task_id in sorted_task_ids:
-        if task_id not in sorted_tasks:
-            sorted_tasks.append(task_id)
+    # Print verification
+    for task in tasks:
+        print(f"Task {task['id']}: ES={task['ES']}, EF={task['EF']}, LS={task['LS']}, LF={task['LF']}, Slack={task['Slack']}, Critical={task['Critical']}")
 
-    return sorted_tasks
+    # Fetch project start date
+    project_start_date_string = cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
 
+    # Convert project_start_date from string to datetime object
+    project_start_datetime = datetime.strptime(project_start_date_string, "%Y-%m-%d")
+
+    # Convert float values (representing days from project start) to SQL DATE format
+    for task in tasks:
+        if task["ES"] is not None:
+            task["ES"] = project_start_datetime + timedelta(days=task["ES"])
+        if task["EF"] is not None:
+            task["EF"] = project_start_datetime + timedelta(days=task["EF"])
+        if task["LS"] != float('inf'):
+            task["LS"] = project_start_datetime + timedelta(days=task["LS"])
+        if task["LF"] != float('inf'):
+            task["LF"] = project_start_datetime + timedelta(days=task["LF"])
+    
+    for task in tasks:
+        cur.execute(
+            """
+            UPDATE wbs
+            SET ES = ?, EF = ?, LS = ?, LF = ?, slack = ?, critical = ?
+            WHERE display_id = ? AND project_id = ? 
+            """,
+            (
+                task["ES"].strftime("%Y-%m-%d") if task["ES"] is not None else None,
+                task["EF"].strftime("%Y-%m-%d") if task["EF"] is not None else None,
+                task["LS"].strftime("%Y-%m-%d") if task["LS"] != float('inf') else None,
+                task["LF"].strftime("%Y-%m-%d") if task["LF"] != float('inf') else None,
+                task["slack"],
+                task["critical"],
+                task["id"],
+                project_id
+            )
+        )
+    g.db.commit()
+
+    # Print verification
+    for task in tasks:
+        print(f"Task {task['id']}: ES={task['ES']}, EF={task['EF']}, LS={task['LS']}, LF={task['LF']}, Slack={task['Slack']}, Critical={task['Critical']}")
+
+
+def calculate_date_cpm2():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+
+    # Fetch project start date
+    project_start_date =  cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+
+    # Fetch WBS table with tasks and predecessors
+    wbs_table = cur.execute(
+        """
+        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.id
+        ORDER BY wbs.display_id
+        """,
+        (project_id,)
+    ).fetchall()
+
+    # initialization
+    tasks = []
+    for row, i in enumerate(wbs_table):
+        tasks[i]["id"] = row["id"]
+        tasks[i]["duration"] = row["duration"]
+        tasks[i]["predecessors"] = row["predecessors"]
+        tasks[i]["ES"] = 0
+        tasks[i]["EF"] = 0
+        tasks[i]["LS"] = 65536 # infinite
+        tasks[i]["LF"] = 65536 # infinite
+        tasks[i]["Slack"] = 65536 # infinite
+        tasks[i]["Critical"] = False # for now
+    
+    # Perform Forward Pass (Earliest Start/Finish Calculation)
+    while True:
+        for task, i in enumerate(tasks):
+            task["predecessors"]
+            
+            if not predecessor:
+                tasks[i]["ES"] = project_start_date
+            else:
+                predecessor_ES = 0
+                for predecessor in tasks[i]["predecessors"]:
+                    if predecessor_ES > tasks[predecessor]["ES"]:
+                        predecessor_ES = tasks[predecessor]["ES"]
+                task[i]["ES"] = predecessor_ES
+
+            tasks[i]["EF"] = tasks[i]["ES"] + tasks[i]["duration"]
+
+
+
+    """ 
+    Atributes each task has:
+    id = task["id"]
+    duration = task["duration"]
+    # calculated from earliest task to latest task:
+        Early Start (ES) = latest EF of the task's predecessor (equals to project_start_date if no predecessor)
+        Early Finish (EF) = EF + duration
+    # calculated from latest task to earliest:
+        Late Start (LS) = LF - duration
+        Late Finish (LF) = earliest LS of the task's successors
+    Total Slack = LS - ES or LF - EF
+    Critical bool = true if total slack == 0
+
+    1. Fetch all tasks from the database
+    - For each task, initialize ES, EF, LS, LF, Slack, Critical
+    
+    2. Perform Forward Pass (Earliest Start/Finish Calculation)
+        For each task in topological order:
+            if task has no predecessors:
+                ES = project_start_date
+                EF = ES + task_duration
+            else:
+                ES = max(EF of all predecessors)
+                EF = ES + task_duration
+
+    3. Perform Backward Pass (Latest Start/Finish Calculation)
+        For each task in reverse topological order:
+            if task has no successors:
+                LF = project_end_date or EF of the last task
+                LS = LF - task_duration
+            else:
+                LF = min(LS of all successors)
+                LS = LF - task_duration
+
+    4. Calculate Slack for each task
+        For each task:
+            Slack = LS - ES or LF - EF
+            if Slack == 0:
+                mark task as Critical (belongs to Critical Path)
+
+    5. Output or update the database with:
+        - Early Start (ES), Early Finish (EF)
+        - Late Start (LS), Late Finish (LF)
+        - Slack, Critical status
+        - The critical path (sequence of tasks with zero slack)
+    """
+
+
+    
+
+
+    cur.close()
+
+    
 
 def calculate_dates():
     cur = get_db().cursor()
@@ -143,11 +365,8 @@ def calculate_dates():
         (project_id,)
     ).fetchall()
     
-    # Ensure task["id"] is used in topological_sort, not task["display_id"]
-    sorted_task_ids = topological_sort([{"id": task["id"], "predecessors": task["predecessors"].split(",") if task["predecessors"] else []} for task in wbs_table])
-
-    for task_id in sorted_task_ids:
-        task = next(task for task in wbs_table if task["id"] == task_id)
+    for task in wbs_table:
+        task_id = task["id"]
         predecessors = task["predecessors"]
 
         # set start time as project_start_date for first iteration
@@ -190,85 +409,6 @@ def calculate_dates():
             (start_time, end_time, task_id)
         )
         get_db().commit()
-
-    
-    cur.close()
-
-
-
-def calculate_dates2():
-    cur = get_db().cursor()
-    project_id = session.get("project_id")
-
-    # Fetch project start date
-    project_start_date =  cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
-
-    # Get the number of locations
-    locations_count = cur.execute("SELECT display_id FROM lbs WHERE project_id = ? ORDER BY id DESC LIMIT 1", (project_id,)).fetchone()[0]
-    
-    # Fetch WBS table with tasks and possible predecessors
-    wbs_table = cur.execute(
-        """
-        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs_lbs.start_time, wbs_lbs.end_time,
-        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
-        FROM wbs
-        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
-        JOIN wbs_lbs WHERE wbs.id = wbs_lbs.wbs_id --connects to the empty wbs_lbs table
-        WHERE wbs.project_id = ?
-        GROUP BY wbs.display_id, wbs.task, wbs.duration
-        ORDER BY wbs.display_id
-        """,
-        (project_id,)
-    ).fetchall()
-
-    for task in wbs_table:
-        task_id = task["id"]
-        predecessors = task["predecessors"]
-
-        for location in locations_count:
-            location_id = location
-
-            # set start time as project_start_date for task with no predecessor
-            if not predecessors:
-                start_time = datetime.strptime(project_start_date,"%Y-%m-%d")
-                end_time = start_time + timedelta(days=task["duration"])
-                cur.execute("INSERT INTO wbs_lbs (wbs_id, lbs_id, start_time, end_time) VALUES (?, ?, ?, ?)",(task_id, location_id, start_time,end_time,task_id))
-                g.db.commit()
-            else:
-                # get task predecessor of highest duration, extracting both the highest duration (max_dur) and the predecessor end_date
-                predecessor_durations = cur.execute(
-                    """
-                    SELECT wbs.duration, wbs.start_time, wbs.end_time
-                    FROM wbs
-                    JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
-                    WHERE wbs.project_id = ? AND wbs.id = ?
-                    """,
-                (project_id,task_id)
-                ).fetchall()
-                
-                predecessor_max_duration = 0
-                
-                for row in predecessor_durations:
-                    if predecessor_max_duration < row["duration"]:
-                        predecessor_end_time = row["end_time"]
-                        predecessor_max_duration = row["duration"]
-
-                # Use Line of Balance logic to calculate dates
-                if predecessor_max_duration <= task["duration"]:
-                    # Case where predecessor's duration is smaller or equal to current task's duration
-                    start_time = datetime.strptime(predecessor_end_time,"%Y-%m-%d %H:%M:%S")
-                    end_time = start_time + timedelta(days=task["duration"])
-                else:
-                    # Case where predecessor's duration is larger than the current task's duration
-                    end_time = datetime.strptime(predecessor_end_time,"%Y-%m-%d %H:%M:%S") + timedelta(days=task["duration"])
-                    start_time = end_time - timedelta(days=task["duration"])
-
-            # Update the WBS table with calculated start and end times
-            cur.execute(
-                "UPDATE wbs SET start_time = ?, end_time = ? WHERE id = ?", 
-                (start_time, end_time, task_id)
-            )
-            get_db().commit()
 
     
     cur.close()
