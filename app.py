@@ -1,4 +1,4 @@
-from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_dates, calculate_date_cpm
+from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_lob, calculate_date_cpm
 from flask import Flask, flash, redirect, render_template, request, session, url_for, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
@@ -268,7 +268,7 @@ def lob_data():
 
 @app.route('/lob')
 def lob():
-    calculate_date_cpm()
+    calculate_lob()
     return render_template('lob.html')
 
 

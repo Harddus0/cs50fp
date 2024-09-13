@@ -36,7 +36,7 @@ CREATE TABLE wbs (
     LS DATE,
     LF DATE,
     slack FLOAT,
-    critical FLOAT,
+    critical TEXT,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     UNIQUE (project_id, task)
 );
@@ -57,7 +57,8 @@ CREATE TABLE wbs_lbs (
     start_time DATE,
     end_time DATE,
     FOREIGN KEY (wbs_id) REFERENCES wbs(id) ON DELETE CASCADE,
-    FOREIGN KEY (lbs_id) REFERENCES lbs(id) ON DELETE CASCADE
+    FOREIGN KEY (lbs_id) REFERENCES lbs(id) ON DELETE CASCADE,
+    UNIQUE (wbs_id, lbs_id)
 );
 
 CREATE TABLE resources (

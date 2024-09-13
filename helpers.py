@@ -188,10 +188,6 @@ def calculate_date_cpm():
         if task["Slack"] == 0:
             task["Critical"] = True
 
-    # Print verification
-    for task in tasks:
-        print(f"Task {task['id']}: ES={task['ES']}, EF={task['EF']}, LS={task['LS']}, LF={task['LF']}, Slack={task['Slack']}, Critical={task['Critical']}")
-
     # Fetch project start date
     project_start_date_string = cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
 
@@ -221,125 +217,129 @@ def calculate_date_cpm():
                 task["EF"].strftime("%Y-%m-%d") if task["EF"] is not None else None,
                 task["LS"].strftime("%Y-%m-%d") if task["LS"] != float('inf') else None,
                 task["LF"].strftime("%Y-%m-%d") if task["LF"] != float('inf') else None,
-                task["slack"],
-                task["critical"],
+                task["Slack"],
+                task["Critical"],
                 task["id"],
                 project_id
             )
         )
     g.db.commit()
+    
+    cur.close()
 
     # Print verification
-    for task in tasks:
-        print(f"Task {task['id']}: ES={task['ES']}, EF={task['EF']}, LS={task['LS']}, LF={task['LF']}, Slack={task['Slack']}, Critical={task['Critical']}")
+    # for task in tasks:
+    #     print(f"Task {task['id']}: ES={task['ES']}, EF={task['EF']}, LS={task['LS']}, LF={task['LF']}, Slack={task['Slack']}, Critical={task['Critical']}")
+    
 
-
-def calculate_date_cpm2():
+def calculate_lob():
     cur = get_db().cursor()
     project_id = session.get("project_id")
-
-    # Fetch project start date
-    project_start_date =  cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
-
-    # Fetch WBS table with tasks and predecessors
+    project_start_time = 0  # Use the actual project start time here
+    
+    # Fetch WBS table with critical tasks and predecessors
     wbs_table = cur.execute(
         """
-        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time,
+        SELECT id, wbs.display_id, wbs.task, wbs.duration,
         GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
         FROM wbs
         LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
-        WHERE wbs.project_id = ?
+        WHERE wbs.project_id = ? AND critical = 1
         GROUP BY wbs.id
-        ORDER BY wbs.display_id
+        ORDER BY wbs.ES
         """,
         (project_id,)
     ).fetchall()
-
-    # initialization
+    
+    # Fetch LBS table (locations)
+    locations = cur.execute(
+        """
+        SELECT id, display_id, location FROM lbs
+        WHERE project_id = ?
+        """,
+        (project_id,)
+    ).fetchall()
+    
+    # Initialize tasks with location data
     tasks = []
-    for row, i in enumerate(wbs_table):
-        tasks[i]["id"] = row["id"]
-        tasks[i]["duration"] = row["duration"]
-        tasks[i]["predecessors"] = row["predecessors"]
-        tasks[i]["ES"] = 0
-        tasks[i]["EF"] = 0
-        tasks[i]["LS"] = 65536 # infinite
-        tasks[i]["LF"] = 65536 # infinite
-        tasks[i]["Slack"] = 65536 # infinite
-        tasks[i]["Critical"] = False # for now
-    
-    # Perform Forward Pass (Earliest Start/Finish Calculation)
-    while True:
-        for task, i in enumerate(tasks):
-            task["predecessors"]
-            
-            if not predecessor:
-                tasks[i]["ES"] = project_start_date
-            else:
-                predecessor_ES = 0
-                for predecessor in tasks[i]["predecessors"]:
-                    if predecessor_ES > tasks[predecessor]["ES"]:
-                        predecessor_ES = tasks[predecessor]["ES"]
-                task[i]["ES"] = predecessor_ES
+    task_dict = {} # Create a lookup dictionary for tasks
+    for row in wbs_table:
+        task = {
+            "id": row["id"],
+            "duration": row["duration"],
+            "predecessors": row["predecessors"].split(",") if row["predecessors"] else [],
+            "locations": [
+                {"location_id": loc["id"], "start_time": None, "end_time": None} for loc in locations
+            ]
+        }
+        tasks.append(task)
+        task_dict[task["id"]] = task  # Map task by its id for easy lookup
 
-            tasks[i]["EF"] = tasks[i]["ES"] + tasks[i]["duration"]
+    first_end = 0
+    last_end = 0
 
+    # Forward and Backward passes through each task and each location
+    for task in tasks:
+        temp = 0
+        
+        # Calculate max predecessor duration
+        max_pred_dur = 0
+        for predecessor_id in task["predecessors"]:
+            predecessor_id = int(predecessor_id)  # Ensure it's an integer
+            predecessor = task_dict.get(predecessor_id)  # Look up the predecessor task
+            if predecessor:
+                max_pred_dur = max(max_pred_dur, predecessor["duration"])
 
+        # Check if it's first task or if task is longer than predecessor
+        if not task["predecessors"] or task["duration"] > max_pred_dur:
+        
+            # Forward pass: calculate start_time and end_time per location
+            for loc in task["locations"]:
+                if temp == 0:  # First location
+                    if first_end == 0:
+                        loc["start_time"] = project_start_time
+                    else:
+                        loc["start_time"] = first_end
+                    loc["end_time"] = loc["start_time"] + task["duration"]
+                    temp = loc["end_time"]
+                    first_end = loc["end_time"] # Update first_end for the next task
+                else:
+                    loc["start_time"] = temp
+                    loc["end_time"] = loc["start_time"] + task["duration"]
+                    temp = loc["end_time"]
+                last_end = loc["end_time"] # Update last_end for the backward pass
 
-    """ 
-    Atributes each task has:
-    id = task["id"]
-    duration = task["duration"]
-    # calculated from earliest task to latest task:
-        Early Start (ES) = latest EF of the task's predecessor (equals to project_start_date if no predecessor)
-        Early Finish (EF) = EF + duration
-    # calculated from latest task to earliest:
-        Late Start (LS) = LF - duration
-        Late Finish (LF) = earliest LS of the task's successors
-    Total Slack = LS - ES or LF - EF
-    Critical bool = true if total slack == 0
+            temp = 0 # Reset temp for backward pass
 
-    1. Fetch all tasks from the database
-    - For each task, initialize ES, EF, LS, LF, Slack, Critical
-    
-    2. Perform Forward Pass (Earliest Start/Finish Calculation)
-        For each task in topological order:
-            if task has no predecessors:
-                ES = project_start_date
-                EF = ES + task_duration
-            else:
-                ES = max(EF of all predecessors)
-                EF = ES + task_duration
+        else:
+            # Backward pass: calculate start_time and end_time in reverse order
+            for loc in reversed(task["locations"]):
+                if temp == 0:  # Last location
+                    loc["start_time"] = last_end
+                    loc["end_time"] = loc["start_time"] + task["duration"]
+                    temp = loc["start_time"]
+                    last_end = loc["end_time"] # Update last_end for the next backward pass
+                else:
+                    loc["end_time"] = temp
+                    loc["start_time"] = loc["end_time"] - task["duration"]
+                    temp = loc["start_time"]
+                first_end = loc["end_time"] # Update first_end for forward pass
 
-    3. Perform Backward Pass (Latest Start/Finish Calculation)
-        For each task in reverse topological order:
-            if task has no successors:
-                LF = project_end_date or EF of the last task
-                LS = LF - task_duration
-            else:
-                LF = min(LS of all successors)
-                LS = LF - task_duration
+    # Insert the task-location timing into wbs_lbs table
+    for task in tasks:
+        for loc in task["locations"]:
+            cur.execute(
+                """
+                INSERT INTO wbs_lbs (wbs_id, lbs_id, start_time, end_time)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(wbs_id, lbs_id) DO UPDATE SET
+                start_time = excluded.start_time,
+                end_time = excluded.end_time
+                """,
+                (task["id"], loc["location_id"], loc["start_time"], loc["end_time"])
+            )
+    get_db().commit()
 
-    4. Calculate Slack for each task
-        For each task:
-            Slack = LS - ES or LF - EF
-            if Slack == 0:
-                mark task as Critical (belongs to Critical Path)
-
-    5. Output or update the database with:
-        - Early Start (ES), Early Finish (EF)
-        - Late Start (LS), Late Finish (LF)
-        - Slack, Critical status
-        - The critical path (sequence of tasks with zero slack)
-    """
-
-
-    
-
-
-    cur.close()
-
-    
 
 def calculate_dates():
     cur = get_db().cursor()
@@ -354,7 +354,7 @@ def calculate_dates():
     # Fetch WBS table with tasks and possible predecessors
     wbs_table = cur.execute(
         """
-        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time,
+        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time, wbs.critical,
         GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
         FROM wbs
         LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
