@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Gantt Chart
+{% endblock %}
+
+{% block main %}
+
+<div class="card">
+    <div class="card-body">
+        <h5>Gantt Chart</h5>
+        <hr>
+        <div id="ganttChart" style="width: 100%; height: 100%;"></div>
+    </div>
+</div>
+
+<script>
+    const colorMap = {};  // Task to color mapping
+const taskColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'];  // Define colors
+
+fetch('/gantt-total-data')
+    .then(response => response.json())
+    .then(data => {
+        console.log("Received Gantt data:", data);
+
+        const tasks = data.map(d => {
+            const taskName = d.task.split(' ')[0];  // Extract task name before location
+            if (!colorMap[taskName]) {
+                colorMap[taskName] = taskColors[Object.keys(colorMap).length % taskColors.length];
+            }
+
+            return {
+                x: [d.start_time, d.end_time],
+                y: [d.task, d.task],
+                mode: 'lines',
+                type: 'scatter',
+                line: {
+                    width: 10,
+                    color: colorMap[taskName]  // Assign color from map
+                },
+                name: d.task,
+                text: [`Duration: ${d.duration} days`],
+                textposition: 'top center',
+                textfont: {
+                    family: 'Arial',
+                    size: 12,
+                    color: '#000000'
+                }
+            };
+        });
+
+        const layout = {
+            title: 'Standard Floor Gantt Chart',
+            xaxis: {
+                title: 'Time',
+                type: 'date',
+                tickformat: '%Y-%m-%d'
+            },
+            yaxis: {
+                title: 'Tasks',
+                tickvals: data.map(d => d.task),
+                ticktext: data.map(d => d.task)
+            },
+            height: data.length * 50 + 100,  // Dynamically adjust height
+            margin: { l: 100, r: 100, t: 100, b: 50 }
+        };
+
+        Plotly.newPlot('ganttChart', tasks, layout);
+    })
+    .catch(error => console.error("Error fetching Gantt data:", error));
+
+</script>
+
+{% endblock %}

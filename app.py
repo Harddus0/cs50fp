@@ -234,7 +234,76 @@ def task():
     return render_template("task.html",wbs_table=get_project_wbs())
 
 
+@app.route("/wbs")
+@login_required
+def wbs():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    calculate_date_cpm()
+
+    data_wbs = cur.execute(
+        """
+        SELECT wbs.task, wbs.duration, wbs.ES, wbs.EF, wbs.LS, wbs.LF, wbs.slack, wbs.critical,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.id
+        ORDER BY wbs.display_id DESC
+        """,
+        (project_id,)
+    ).fetchall()
+    cur.close()
+    return render_template("wbs.html", data_wbs=data_wbs)
+
+
+@app.route("/gantt-data")
+@login_required
+def gantt_data():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    calculate_date_cpm()
+
+    data_wbs = cur.execute(
+        """
+        SELECT wbs.task, wbs.duration, wbs.ES, wbs.EF, wbs.critical,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.id
+        ORDER BY wbs.display_id DESC
+        """,
+        (project_id,)
+    ).fetchall()
+
+    # If data is empty, print for debugging
+    if not data_wbs:
+        print("No data returned for project:", project_id)
+
+    gantt_data = []
+    for row in data_wbs:
+        gantt_data.append({
+            "task": row["task"],
+            "predecessors": row["predecessors"],
+            "duration": row["duration"],
+            "ES": row["ES"],
+            "EF": row["EF"],
+            "critical": row["critical"]
+        })
+    
+    return jsonify(gantt_data)
+    
+
+
+@app.route("/gantt")
+@login_required
+def gantt():
+    return render_template("gantt.html")
+
+
 @app.route("/lob-data")
+@login_required
 def lob_data():
     cur = get_db().cursor()
     project_id = session.get("project_id")
@@ -276,8 +345,51 @@ def lob_data():
 
 
 @app.route('/lob')
+@login_required
 def lob():
     return render_template('lob.html')
+
+
+@app.route("/gantt-total-data")
+@login_required
+def gantt_total_data():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    calculate_date_cpm()
+    calculate_lob()
+
+    data_wbs = cur.execute(
+        """
+        SELECT wbs.task, wbs.duration, wbs_lbs.start_time, wbs_lbs.end_time, lbs.location
+        FROM wbs_lbs
+        JOIN wbs ON wbs.id = wbs_lbs.wbs_id
+        JOIN lbs ON lbs.id = wbs_lbs.lbs_id
+        WHERE wbs.project_id = ?
+        ORDER BY wbs.display_id DESC, lbs.display_id DESC
+        """,
+        (project_id,)
+    ).fetchall()
+
+    # If data is empty, print for debugging
+    if not data_wbs:
+        print("No data returned for project:", project_id)
+
+    gantt_data = []
+    for row in data_wbs:
+        gantt_data.append({
+            "task": row["task"]+" "+row["location"],
+            "duration": row["duration"],
+            "start_time": row["start_time"],
+            "end_time": row["end_time"]
+        })
+    
+    return jsonify(gantt_data)
+
+
+@app.route('/gantt-total')
+@login_required
+def gantt_total():
+    return render_template('gantt-total.html')
 
 
 @app.route('/chart')

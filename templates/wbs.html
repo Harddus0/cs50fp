@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    WBS
+{% endblock %}
+
+{% block main %}
+<div class="container">
+    <h3>Work Breakdown Structure </h3>
+
+    <!-- Table to display added tasks -->
+    <table class="table table-striped" id="wbs-table">
+        <thead>
+            <tr>
+                <TH>id</TH>
+                <th>Task</th>
+                <th>Duration</th>
+                <th>Predecessor</th>
+                <th>ES</th>
+                <th>EF</th>
+                <th>LS</th>
+                <th>LF</th>
+                <th>slack</th>
+                <th>critical</th>
+                <th></th> <!-- Add/Delete column -->
+            </tr>
+        </thead>
+        
+        <tbody id="wbs-tbody">
+            {% for row in data_wbs %}
+                <tr>
+                    <td>{{ row["display_id"] }}</td>
+                    <td>{{ row["task"] }}</td>
+                    <td>{{ row["duration"] }}</td>
+                    <td>{{ row["predecessors"] or none }}</td>
+                    <td>{{ row["ES"] }}</td>
+                    <td>{{ row["EF"] }}</td>
+                    <td>{{ row["LS"] }}</td>
+                    <td>{{ row["LF"] }}</td>
+                    <td>{{ row["slack"] }}</td>
+                    <td>
+                        {% if row["critical"] == "1" %}
+                        Yes
+                        {% else %}
+                        No
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
