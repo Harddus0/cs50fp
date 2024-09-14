@@ -75,3 +75,8 @@ CREATE TABLE wbs_resources (
     FOREIGN KEY (wbs_id) REFERENCES wbs(id) ON DELETE CASCADE,
     FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
 );
+
+-- queue to select data for lob chart
+SELECT wbs.task, wbs.display_id, wbs_lbs.start_time, wbs_lbs.end_time, lbs.location FROM wbs_lbs
+JOIN wbs ON wbs.id = wbs_lbs.wbs_id
+JOIN lbs ON lbs.id = wbs_lbs.lbs_id;

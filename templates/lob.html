@@ -5,89 +5,47 @@
 {% endblock %}
 
 {% block main %}
-<div>
-    <canvas id="lobChart" width="800" height="400"></canvas>
-</div>
-
-<script>
-    // Fetch the LOB data from the Flask endpoint
+    <div class="card">
+        <div class="card-body">
+            <h5>Line of Balance</h5>
+            <hr>
+            <div class="chart-container">
+                <div id="lobChart" style="width: 800px; height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // Fetch data from Flask backend
     fetch('/lob-data')
         .then(response => response.json())
         .then(data => {
-            console.log(data); // This will help you see the fetched data in your browser's console for debugging
+            console.log("Received data:", data);
 
-            if (data.length === 0) {
-                alert("No data available");
-                return;
-            }
+            const traces = data.map(d => ({
+                x: [new Date(d.start_time), new Date(d.end_time)],
+                y: [1, d.location],
+                mode: 'lines+markers',
+                type: 'scatter',
+                name: d.task
+            }));
 
-            // Prepare data for Chart.js
-            let locations = [];
-            let tasks = {};
-
-            data.forEach(row => {
-                if (!locations.includes(row.location)) {
-                    locations.push(row.location);
-                }
-
-                if (!tasks[row.task]) {
-                    tasks[row.task] = {
-                        label: row.task,
-                        data: []
-                    };
-                }
-
-                tasks[row.task].data.push({
-                    x: new Date(row.start_time),
-                    y: row.location_order
-                });
-
-                tasks[row.task].data.push({
-                    x: new Date(row.end_time),
-                    y: row.location_order
-                });
-            });
-
-            let datasets = Object.keys(tasks).map(task => tasks[task]);
-
-            const ctx = document.getElementById('lobChart').getContext('2d');
-            const lobChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    datasets: datasets
+            const layout = {
+                xaxis: {
+                    title: 'Time',
+                    type: 'date'
                 },
-                options: {
-                    scales: {
-                        x: {
-                            type: 'time',
-                            time: {
-                                unit: 'day'
-                            },
-                            title: {
-                                display: true,
-                                text: 'Date'
-                            }
-                        },
-                        y: {
-                            type: 'linear',
-                            title: {
-                                display: true,
-                                text: 'Location Order'
-                            }
-                        }
-                    },
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
-                    }
+                yaxis: {
+                    title: 'Location',
+                    tickvals: data.map(d => d.location_order),
+                    ticktext: data.map(d => d.location)
                 }
-            });
-        });
-</script>
+            };
+
+            // Render the Plotly chart
+            Plotly.newPlot('lobChart', traces, layout);
+        })
+        .catch(error => console.error("Error fetching LOB data:", error));
+    </script>
+
 {% endblock %}

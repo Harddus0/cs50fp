@@ -1,4 +1,4 @@
-from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_lob, calculate_date_cpm
+from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_lob, calculate_date_cpm, calculate_dates
 from flask import Flask, flash, redirect, render_template, request, session, url_for, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
@@ -238,29 +238,38 @@ def task():
 def lob_data():
     cur = get_db().cursor()
     project_id = session.get("project_id")
-    
-    data = cur.execute(
+    calculate_date_cpm()
+    calculate_dates()
+
+    data_wbs = cur.execute(
         """
-        SELECT wbs.task, wbs.start_time, wbs.end_time, lbs.location, lbs.display_id
+        SELECT task, start_time, end_time
         FROM wbs
-        JOIN lbs ON wbs.project_id = lbs.project_id
-        WHERE wbs.project_id = ?
+        WHERE project_id = ? AND critical = 1
         """, 
         (project_id,)
     ).fetchall()
+
+    total_locations = cur.execute(
+        """
+        SELECT COUNT(DISTINCT display_id) as location_total
+        FROM lbs
+        WHERE project_id = ?
+        """, 
+        (project_id,)
+    ).fetchone()[0]
     
     # If data is empty, print for debugging
-    if not data:
+    if not data_wbs:
         print("No data returned for project:", project_id)
-    
+
     lob_data = []
-    for row in data:
+    for row in data_wbs:
         lob_data.append({
             "task": row["task"],
             "start_time": row["start_time"],
             "end_time": row["end_time"],
-            "location": row["location"],
-            "location_order": row["display_id"]
+            "location": total_locations,
         })
     
     return jsonify(lob_data)
@@ -268,8 +277,12 @@ def lob_data():
 
 @app.route('/lob')
 def lob():
-    calculate_lob()
     return render_template('lob.html')
+
+
+@app.route('/chart')
+def chart():
+    return render_template('chart.html')
 
 
 @app.route("/logout", methods=["GET"])

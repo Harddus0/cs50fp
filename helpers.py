@@ -232,6 +232,7 @@ def calculate_date_cpm():
     #     print(f"Task {task['id']}: ES={task['ES']}, EF={task['EF']}, LS={task['LS']}, LF={task['LF']}, Slack={task['Slack']}, Critical={task['Critical']}")
     
 
+
 def calculate_lob():
     cur = get_db().cursor()
     project_id = session.get("project_id")
@@ -274,6 +275,7 @@ def calculate_lob():
         }
         tasks.append(task)
         task_dict[task["id"]] = task  # Map task by its id for easy lookup
+        
 
     first_end = 0
     last_end = 0
@@ -325,6 +327,18 @@ def calculate_lob():
                     temp = loc["start_time"]
                 first_end = loc["end_time"] # Update first_end for forward pass
 
+    # Fetch project start date
+    project_start_date_string = cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+
+    # Convert project_start_date from string to datetime object
+    project_start_datetime = datetime.strptime(project_start_date_string, "%Y-%m-%d")
+
+    # Convert float values (representing days from project start) to SQL DATE format
+    for task in tasks:
+        for loc in task["locations"]:
+            loc["start_time"] = project_start_datetime + timedelta(days=loc["start_time"])
+            loc["end_time"] = project_start_datetime + timedelta(days=loc["end_time"])
+
     # Insert the task-location timing into wbs_lbs table
     for task in tasks:
         for loc in task["locations"]:
@@ -336,9 +350,50 @@ def calculate_lob():
                 start_time = excluded.start_time,
                 end_time = excluded.end_time
                 """,
-                (task["id"], loc["location_id"], loc["start_time"], loc["end_time"])
+                (   
+                    task["id"],
+                    loc["location_id"],
+                    loc["start_time"].strftime("%Y-%m-%d"),
+                    loc["end_time"].strftime("%Y-%m-%d")
+                )
             )
     get_db().commit()
+
+
+def topological_sort(tasks):
+    # Construir o grafo
+    in_degree = defaultdict(int)
+    graph = defaultdict(list)
+    
+    for task in tasks:
+        if task["predecessors"] is not None:
+            for pred_id in task["predecessors"]:
+                print("this is pred_id", pred_id)
+                graph[int(pred_id)].append(task["display_id"])
+                in_degree[task["display_id"]] += 1
+        if task["display_id"] not in in_degree:
+            in_degree[task["display_id"]] = 0
+
+    # Fila para armazenar nós com grau de entrada zero
+    zero_in_degree = deque([task["display_id"] for task in tasks if in_degree[task["display_id"]] == 0])
+
+    sorted_tasks = []
+    
+    while zero_in_degree:
+        node = zero_in_degree.popleft()
+        sorted_tasks.append(node)
+        
+        for successor in graph[node]:
+            in_degree[successor] -= 1
+            if in_degree[successor] == 0:
+                zero_in_degree.append(successor)
+    
+    print("This is your sorted tasks:", sorted_tasks)
+
+    if len(sorted_tasks) != len(tasks):
+        raise ValueError("O grafo contém ciclos")
+
+    return sorted_tasks
 
 
 def calculate_dates():
@@ -346,15 +401,16 @@ def calculate_dates():
     project_id = session.get("project_id")
 
     # Fetch project start date
-    project_start_date =  cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+    project_start_date_str = cur.execute("SELECT start_date FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+    project_start_date = datetime.strptime(project_start_date_str, "%Y-%m-%d")
 
     # Get the number of locations
     locations_count = cur.execute("SELECT display_id FROM lbs WHERE project_id = ? ORDER BY id DESC LIMIT 1", (project_id,)).fetchone()[0]
-    
+
     # Fetch WBS table with tasks and possible predecessors
     wbs_table = cur.execute(
         """
-        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time, wbs.critical,
+        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time, 
         GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
         FROM wbs
         LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
@@ -364,51 +420,69 @@ def calculate_dates():
         """,
         (project_id,)
     ).fetchall()
+
+    # Convert to list of dictionaries for processing
+    tasks = [
+        {
+            "id": row["id"],
+            "display_id": row["display_id"],
+            "task": row["task"],
+            "duration": row["duration"],
+            "predecessors": row["predecessors"].split(",") if row["predecessors"] else [],
+            "start_time": None,
+            "end_time": None
+        }
+        for row in wbs_table
+    ]
+
+    # Convert list of tasks to a dictionary for quick lookup
+    task_dict = {task["display_id"]: task for task in tasks}
+
+    # Topological Sort to get processing order
+    sorted_display_ids = topological_sort(tasks)
     
-    for task in wbs_table:
-        task_id = task["id"]
+    # Create a mapping of display_id to sorted tasks
+    sorted_tasks = [task_dict[display_id] for display_id in sorted_display_ids]
+
+    for task in sorted_tasks:
         predecessors = task["predecessors"]
 
-        # set start time as project_start_date for first iteration
+        # Set start time as project_start_date for tasks with no predecessors
         if not predecessors:
-            start_time = datetime.strptime(project_start_date,"%Y-%m-%d")
-            end_time = start_time + timedelta(days=task["duration"] * locations_count)
-            cur.execute("UPDATE wbs SET start_time = ?, end_time = ? WHERE id = ?", (start_time,end_time,task_id))
-            g.db.commit()
+            task["start_time"] = project_start_date
+            task["end_time"] = task["start_time"] + timedelta(days=task["duration"] * locations_count)
         else:
             # get task predecessor of highest duration, extracting both the highest duration (max_dur) and the predecessor end_date
-            predecessor_durations = cur.execute(
-                """
-                SELECT wbs.duration, wbs.start_time, wbs.end_time
-                FROM wbs
-                JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
-                WHERE wbs.project_id = ? AND wbs.id = ?
-                """,
-            (project_id,task_id)
-            ).fetchall()
+            max_pred_dur = 0
+            max_pred_end = project_start_date
+            max_pred_start = project_start_date
 
-            predecessor_max_duration = 0
-            for row in predecessor_durations:
-                if predecessor_max_duration < row["duration"]:
-                    predecessor_end_time = row["end_time"]
-                    predecessor_max_duration = row["duration"]
+            for predecessor_id in predecessors:
+                predecessor_id = int(predecessor_id)  # Ensure it's an integer
+                predecessor = task_dict.get(predecessor_id)  # Look up the predecessor task
+
+                if predecessor["end_time"]:
+                    max_pred_end = max(max_pred_end, predecessor["end_time"])
+                if predecessor["start_time"]:
+                    max_pred_start = max(max_pred_start, predecessor["start_time"])
+                max_pred_dur = max(max_pred_dur, predecessor["duration"])
 
             # Use Line of Balance logic to calculate dates
-            if predecessor_max_duration <= task["duration"]:
+            if max_pred_dur <= task["duration"]:
                 # Case where predecessor's duration is smaller or equal to current task's duration
-                start_time = datetime.strptime(predecessor_end_time,"%Y-%m-%d %H:%M:%S")
-                end_time = start_time + timedelta(days=task["duration"] * locations_count)
+                task["start_time"] = max_pred_start + timedelta(days=max_pred_dur)
+                task["end_time"] = task["start_time"] + timedelta(days=task["duration"] * locations_count)
             else:
                 # Case where predecessor's duration is larger than the current task's duration
-                end_time = datetime.strptime(predecessor_end_time,"%Y-%m-%d %H:%M:%S") + timedelta(days=task["duration"])
-                start_time = end_time - timedelta(days=task["duration"] * (locations_count - 1))
+                task["end_time"] = max_pred_end + timedelta(days=task["duration"])
+                task["start_time"] = task["end_time"] - timedelta(days=task["duration"] * (locations_count - 1))
 
+    for task in tasks:
         # Update the WBS table with calculated start and end times
         cur.execute(
             "UPDATE wbs SET start_time = ?, end_time = ? WHERE id = ?", 
-            (start_time, end_time, task_id)
+            (task["start_time"].strftime("%Y-%m-%d %H:%M:%S"), task["end_time"].strftime("%Y-%m-%d %H:%M:%S"), task["id"])
         )
         get_db().commit()
 
-    
     cur.close()

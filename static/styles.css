@@ -49,3 +49,10 @@ body {
     font-size: 14px;
     line-height: 1.5;
 }
+
+.chart-container {
+  display: flex;
+  justify-content: center;  /* Centers horizontally */
+  align-items: center;      /* Centers vertically */
+  height: 100%;             /* Full height for vertical centering (optional) */
+}

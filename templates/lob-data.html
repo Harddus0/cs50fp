@@ -1,18 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Line of Balance</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <canvas id="lobChart" width="400" height="200"></canvas>
+{% extends "layout.html" %}
 
+{% block title %}
+    Line of Balance
+{% endblock %}
+
+{% block main %}
+    <canvas id="lobChart" width="400" height="200"></canvas>
     <script>
         fetch('/lob-data')
             .then(response => response.json())
             .then(data => {
+                console.log(data); // Add this for debugging
+
+                if (data.length === 0) {
+                    alert("No data available");
+                    return;
+                }
+
                 // Process the data to extract labels and datasets
                 let locations = [];
                 let tasks = {};
@@ -29,60 +33,58 @@
                         };
                     }
 
-                    // Push the corresponding start time and end time for the task at each location
                     tasks[row.task].data.push({
                         x: new Date(row.start_time),
                         y: row.location_order
                     });
+
                     tasks[row.task].data.push({
                         x: new Date(row.end_time),
                         y: row.location_order
                     });
                 });
 
-                // Convert tasks object to datasets array
                 let datasets = Object.keys(tasks).map(task => tasks[task]);
 
                 const ctx = document.getElementById('lobChart').getContext('2d');
+                const sampleData = [
+                    {
+                        label: 'Task A',
+                        data: [
+                            { x: 0, y: 1 },
+                            { x: 10, y: 2 },
+                            { x: 20, y: 3 }
+                        ],
+                        fill: false,
+                        borderColor: 'blue',
+                        tension: 0.1
+                    }
+                ];
+
                 const lobChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: locations,
-                        datasets: datasets
+                        datasets: sampleData
                     },
                     options: {
                         scales: {
                             x: {
-                                type: 'time',
-                                time: {
-                                    unit: 'day'
-                                },
+                                type: 'linear',
                                 title: {
                                     display: true,
-                                    text: 'Date'
+                                    text: 'Time'
                                 }
                             },
                             y: {
                                 type: 'linear',
                                 title: {
                                     display: true,
-                                    text: 'Location Order'
+                                    text: 'Location'
                                 }
-                            }
-                        },
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'top'
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
                             }
                         }
                     }
                 });
             });
     </script>
-</body>
-</html>
+{% endblock %}
