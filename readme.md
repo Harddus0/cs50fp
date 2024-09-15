@@ -39,15 +39,16 @@ git clone https://github.com/Harddus0/cs50fp.git
 
 
 ## project structure
-
-> hardplan/ 
-> ├── static/ # Static files (CSS, JS, etc.)
-> ├── templates/ # HTML files
-> ├── app.py # Main application
-> ├── helpers.py # Utility functions and scheduling algorithms
-> ├── database.db # SQLite3 database 
-> ├── requirements.txt # Dependencies 
-> └── README.md # Project README
+```
+cs50fp/ 
+    ├── static/             # Static files (CSS, JS, etc.)
+    ├── templates/          # HTML files
+    ├── app.py              # Main application
+    ├── helpers.py          # Utility functions and scheduling algorithms
+    ├── database.db         # SQLite3 database 
+    ├── requirements.txt    # Dependencies 
+    └── README.md           # Project README
+```
 
 ### Routes Overview
 
