@@ -21,37 +21,57 @@
         </div>
     </div>
     
+    <div class="card">
+        <div class="card-body">
+            <h5>Line of Balance</h5>
+            <hr>
+            <div class="chart-container">
+                <div id="lobChart" style="width: 100%; height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Made with help from ChatGPT -->
     <script>
-    // Fetch data from Flask backend
-    fetch('/lob-data')
-        .then(response => response.json())
-        .then(data => {
-            console.log("Received data:", data);
-
-            const traces = data.map(d => ({
-                x: [new Date(d.start_time), new Date(d.end_time)],
-                y: [1, d.location],
-                mode: 'lines+markers',
-                type: 'scatter',
-                name: d.task
-            }));
-
-            const layout = {
-                xaxis: {
-                    title: 'Time',
-                    type: 'date'
-                },
-                yaxis: {
-                    title: 'Location',
-                    tickvals: data.map(d => d.location_order),
-                    ticktext: data.map(d => d.location)
-                }
-            };
-
-            // Render the Plotly chart
-            Plotly.newPlot('lobChart', traces, layout);
-        })
-        .catch(error => console.error("Error fetching LOB data:", error));
+        // Fetch data from Flask backend
+        fetch('/lob-data')
+            .then(response => response.json())
+            .then(data => {
+                console.log("Received data:", data);
+    
+                // Determine the maximum location value
+                const maxLocation = Math.max(...data.map(d => d.location));
+    
+                // Generate an array from 1 to the maximum location
+                const tickvals = Array.from({ length: maxLocation }, (_, i) => i + 1);
+    
+                // Create traces for the plot
+                const traces = data.map(d => ({
+                    x: [new Date(d.start_time), new Date(d.end_time)],
+                    y: [1, d.location],
+                    mode: 'lines+markers',
+                    type: 'scatter',
+                    name: d.task
+                }));
+    
+                // Define layout with updated y-axis settings
+                const layout = {
+                    xaxis: {
+                        title: 'Time',
+                        type: 'date'
+                    },
+                    yaxis: {
+                        title: 'Location',
+                        tickvals: tickvals,
+                        ticktext: tickvals.map(val => val.toString()) // Convert numbers to strings for labels
+                    }
+                };
+    
+                // Render the Plotly chart
+                Plotly.newPlot('lobChart', traces, layout);
+            })
+            .catch(error => console.error("Error fetching LOB data:", error));
     </script>
+    
 
 {% endblock %}

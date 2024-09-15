@@ -418,42 +418,6 @@ def calculate_lob():
     get_db().commit()
 
 
-def topological_sort(tasks):
-    # Build the graph
-    in_degree = defaultdict(int)
-    graph = defaultdict(list)
-    
-    for task in tasks:
-        if task["predecessors"] is not None:
-            for pred_id in task["predecessors"]:
-                print("this is pred_id", pred_id)
-                graph[int(pred_id)].append(task["display_id"])
-                in_degree[task["display_id"]] += 1
-        if task["display_id"] not in in_degree:
-            in_degree[task["display_id"]] = 0
-
-    # Queue to store nodes with zero in_degree
-    zero_in_degree = deque([task["display_id"] for task in tasks if in_degree[task["display_id"]] == 0])
-
-    sorted_tasks = []
-    
-    while zero_in_degree:
-        node = zero_in_degree.popleft()
-        sorted_tasks.append(node)
-        
-        for successor in graph[node]:
-            in_degree[successor] -= 1
-            if in_degree[successor] == 0:
-                zero_in_degree.append(successor)
-    
-    print("This is your sorted tasks:", sorted_tasks)
-
-    if len(sorted_tasks) != len(tasks):
-        raise ValueError("O grafo contém ciclos")
-
-    return sorted_tasks
-
-
 def calculate_lob_total():
     cur = get_db().cursor()
     project_id = session.get("project_id")
