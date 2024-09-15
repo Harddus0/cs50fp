@@ -40,14 +40,14 @@ git clone https://github.com/Harddus0/cs50fp.git
 
 ## project structure
 
-hardplan/ 
-├── static/ # Static files (CSS, JS, etc.)
-├── templates/ # HTML files
-├── app.py # Main application
-├── helpers.py # Utility functions and scheduling algorithms
-├── database.db # SQLite3 database 
-├── requirements.txt # Dependencies 
-└── README.md # Project README
+> hardplan/ 
+> ├── static/ # Static files (CSS, JS, etc.)
+> ├── templates/ # HTML files
+> ├── app.py # Main application
+> ├── helpers.py # Utility functions and scheduling algorithms
+> ├── database.db # SQLite3 database 
+> ├── requirements.txt # Dependencies 
+> └── README.md # Project README
 
 ### Routes Overview
 
@@ -76,7 +76,7 @@ hardplan/
 | `wbs_predecessors` | Handles multiple task predecessors                                       |
 | `wbs_lbs`          | Links tasks (WBS) to locations (LBS)                                     |
 
-### helpers.py functions
+## helpers.py functions
 
 - **Database Management**:
     - `get_db()` and `close_db()`: Handle database connections.
@@ -94,7 +94,7 @@ hardplan/
     - `gantt-data` and `lob-data`: Fetch data for Gantt charts and Line of Balance using Plotly.js.
 
 
-### app.py Overview
+## app.py Overview
 
 - **index**: Homepage.
 - **login and register**: Handle user login and registration.
@@ -108,7 +108,7 @@ hardplan/
 - **lob-data**: Provides Line of Balance data for visualization.
 
 
-### HTML Templates Overview
+## HTML Templates Overview
 
 - **layout and layout2**: Define standard page layouts. layout includes a sidebar for core navigation, while layout2 is a simpler layout for pages like login and registration.
 - **login, register, create-project, select-project**: Pages for user input and project creation.
