@@ -1,5 +1,8 @@
 # Hardplan: Construction Project Management Tool
 
+### Video Demo:  <(https://youtu.be/ti2aWJCyybc)>
+
+### Description:
 Hardplan is a web-based application for managing construction projects using scheduling algorithms like the Critical Path Method (CPM) and Line of Balance (LOB). Built with Flask, Python, and SQLite3, it allows users to create Gantt charts and Line of Balance visualizations for better project management.
 
 ## Features
