@@ -1,0 +1,27 @@
+{% extends "layout2.html" %}
+
+{% block title %}
+    Index
+{% endblock %}
+
+{% block main %}
+
+<div class="container d-flex justify-content-center">
+    <div class="border border-primary rounded p-4" style="max-width: 400px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);">
+
+        <form action="/select-project" method="POST">
+            <div class="mb-3">
+                <label for="project" class="form-label">Select a Project</label>
+                <select class="form-select" name="selected_project" id="selected_project">
+                    <option value="" selected disabled>Choose a project</option>
+                    {% for project in projects %}
+                        <option value="{{ project }}">{{ project }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="btn btn-primary w-50" type="submit">Submit</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

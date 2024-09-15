@@ -4,6 +4,12 @@
     Line of Balance
 {% endblock %}
 
+{% block tooltip %}
+    In this chart, time is represented on the horizontal axis, locations are on the vertical axis, and tasks are displayed as lines.
+    Critical tasks from the Typical Floor traverse all locations.
+    The algorithm ensures task sequencing avoids clashes, meaning lines don't cross, by adjusting the start time of faster tasks.
+{% endblock %}
+
 {% block main %}
     <div class="card">
         <div class="card-body">

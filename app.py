@@ -1,7 +1,6 @@
-from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_lob, calculate_date_cpm, calculate_dates
-from flask import Flask, flash, redirect, render_template, request, session, url_for, g, jsonify
+from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_lob, calculate_date_cpm, calculate_lob_total, check_requirements, has_locations, has_tasks, get_mermaid
+from flask import Flask, flash, redirect, render_template, request, session, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -11,8 +10,12 @@ app.teardown_appcontext(close_db)
 @app.route("/")
 def index():
     selected_project = request.form.get("selected_project")
-    return render_template("index.html", selected_project=selected_project)
-
+    user_id = session.get("user_id")
+    
+    if user_id:
+        return render_template("index.html", selected_project=selected_project)
+    else:
+        return redirect("/login")
     
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -52,9 +55,37 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/project", methods=["GET", "POST"])
+@app.route("/create-project", methods=["GET", "POST"])
 @login_required
-def project():
+def create_project():
+
+    if request.method == "POST":
+        cur = get_db().cursor()
+
+        project = request.form.get("project")
+        start_date = request.form.get("start_date")
+
+        if not project:
+            flash("Project name required", "error")
+            return render_template("create-project.html")
+        
+        if not start_date:
+            flash("Project Start Date required", "error")
+            return render_template("create-project.html")
+
+        cur.execute("INSERT INTO projects (user_id, name, start_date) VALUES (?, ?, ?)", (session.get("user_id"), project, start_date))
+
+        g.db.commit()
+        cur.close()
+
+        return render_template("select-project.html", projects=get_user_projects())
+    
+    return render_template("create-project.html")
+
+
+@app.route("/select-project", methods=["GET", "POST"])
+@login_required
+def select_project():
     
     if request.method == "POST":
         cur = get_db().cursor()
@@ -66,28 +97,13 @@ def project():
                 "SELECT id FROM projects WHERE user_id = ? AND name = ?",
                 (session.get("user_id"), selected_project)
             ).fetchone()[0]
+            flash("Project successfully created!","success")
             return render_template("index.html", selected_project=selected_project)
+        else:
+            flash("Select a project to proceed","error")
+            return render_template("select-project.html", projects=get_user_projects())
 
-        project = request.form.get("project")
-        start_date = request.form.get("start_date")
-
-        if not project:
-            flash("Project name required", "error")
-            return render_template("project.html", projects=get_user_projects())
-        
-        if not start_date:
-            flash("Project Start Date required", "error")
-            return render_template("project.html", projects=get_user_projects())
-
-        cur.execute("INSERT INTO projects (user_id, name, start_date) VALUES (?, ?, ?)", (session.get("user_id"), project, start_date))
-
-        g.db.commit()
-        cur.close()
-
-        flash("Project successfully created!","success")
-        return render_template("project.html", projects=get_user_projects())
-
-    return render_template("project.html", projects=get_user_projects())
+    return render_template("select-project.html", projects=get_user_projects())
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -135,7 +151,7 @@ def register():
 
     # GET method
     return render_template("register.html")
-    
+
 
 @app.route("/location", methods=["GET", "POST"])
 @login_required  # Protect this route so only logged-in users can access it
@@ -176,23 +192,25 @@ def location():
 @app.route("/task", methods=["GET", "POST"])
 @login_required  # Protect this route so only logged-in users can access it
 def task():
-
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    
     if request.method == "POST":
-        cur = get_db().cursor()
 
-        project_id = session.get("project_id")
         task_name = request.form.get("task")
         delete_id = request.form.get("id")
         predecessors = request.form.getlist("predecessor")  
-        
-
 
         if delete_id:
-            flash("Successfully deleted", "success")
+            flash("Task successfully deleted", "success")
             cur.execute("DELETE FROM wbs WHERE id = ?", (delete_id,))
             cur.execute("DELETE FROM wbs_predecessors WHERE task_id = ?", (delete_id,))
             g.db.commit()
-            return render_template("task.html", wbs_table=get_project_wbs())
+
+            ready = True
+            mermaid_code = get_mermaid()
+
+            return render_template("task.html", wbs_table=get_project_wbs(), mermaid_code=mermaid_code, ready=ready)
 
         try:
             duration = float(request.form.get("duration"))
@@ -228,14 +246,27 @@ def task():
                 )
         g.db.commit()
 
+        ready = True
+        mermaid_code = get_mermaid()
         flash("Task added successfully!", "success")
-        return render_template("task.html",wbs_table=get_project_wbs())
+
+        return render_template("task.html", wbs_table=get_project_wbs(), mermaid_code=mermaid_code, ready=ready)
     
-    return render_template("task.html",wbs_table=get_project_wbs())
+    task_count = cur.execute("SELECT COUNT(*) FROM wbs WHERE project_id = ?", (project_id,)).fetchone()[0]
+
+    if task_count > 0:
+        ready = True
+        mermaid_code = get_mermaid()
+    else:
+        ready = False
+        mermaid_code = ""
+
+    return render_template("task.html", wbs_table=get_project_wbs(), mermaid_code=mermaid_code, ready=ready)
 
 
 @app.route("/wbs")
 @login_required
+@check_requirements(has_tasks)
 def wbs():
     cur = get_db().cursor()
     project_id = session.get("project_id")
@@ -266,13 +297,13 @@ def gantt_data():
 
     data_wbs = cur.execute(
         """
-        SELECT wbs.task, wbs.duration, wbs.ES, wbs.EF, wbs.critical,
+        SELECT wbs.display_id, wbs.task, wbs.duration, wbs.ES, wbs.EF, wbs.critical,
         GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
         FROM wbs
         LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
         WHERE wbs.project_id = ?
         GROUP BY wbs.id
-        ORDER BY wbs.display_id DESC
+        ORDER BY wbs.display_id DESC 
         """,
         (project_id,)
     ).fetchall()
@@ -284,6 +315,7 @@ def gantt_data():
     gantt_data = []
     for row in data_wbs:
         gantt_data.append({
+            "id": row["display_id"],
             "task": row["task"],
             "predecessors": row["predecessors"],
             "duration": row["duration"],
@@ -297,57 +329,10 @@ def gantt_data():
 
 
 @app.route("/gantt")
+@check_requirements(has_tasks)
 @login_required
 def gantt():
     return render_template("gantt.html")
-
-
-@app.route("/lob-data")
-@login_required
-def lob_data():
-    cur = get_db().cursor()
-    project_id = session.get("project_id")
-    calculate_date_cpm()
-    calculate_dates()
-
-    data_wbs = cur.execute(
-        """
-        SELECT task, start_time, end_time
-        FROM wbs
-        WHERE project_id = ? AND critical = 1
-        """, 
-        (project_id,)
-    ).fetchall()
-
-    total_locations = cur.execute(
-        """
-        SELECT COUNT(DISTINCT display_id) as location_total
-        FROM lbs
-        WHERE project_id = ?
-        """, 
-        (project_id,)
-    ).fetchone()[0]
-    
-    # If data is empty, print for debugging
-    if not data_wbs:
-        print("No data returned for project:", project_id)
-
-    lob_data = []
-    for row in data_wbs:
-        lob_data.append({
-            "task": row["task"],
-            "start_time": row["start_time"],
-            "end_time": row["end_time"],
-            "location": total_locations,
-        })
-    
-    return jsonify(lob_data)
-
-
-@app.route('/lob')
-@login_required
-def lob():
-    return render_template('lob.html')
 
 
 @app.route("/gantt-total-data")
@@ -388,13 +373,10 @@ def gantt_total_data():
 
 @app.route('/gantt-total')
 @login_required
+@check_requirements(has_locations)
+@check_requirements(has_tasks)
 def gantt_total():
     return render_template('gantt-total.html')
-
-
-@app.route('/chart')
-def chart():
-    return render_template('chart.html')
 
 
 @app.route("/logout", methods=["GET"])
@@ -405,3 +387,55 @@ def logout():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
+@app.route("/lob-data")
+@login_required
+def lob_data():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    calculate_date_cpm()
+    calculate_lob_total()
+
+    data_wbs = cur.execute(
+        """
+        SELECT task, start_time, end_time
+        FROM wbs
+        WHERE project_id = ? AND critical = 1
+        """, 
+        (project_id,)
+    ).fetchall()
+
+    total_locations = cur.execute(
+        """
+        SELECT COUNT(DISTINCT display_id) as location_total
+        FROM lbs
+        WHERE project_id = ?
+        """, 
+        (project_id,)
+    ).fetchone()[0]
+    
+    # If data is empty, print for debugging
+    if not data_wbs:
+        print("No data returned for project:", project_id)
+
+    lob_data = []
+    for row in data_wbs:
+        lob_data.append({
+            "task": row["task"],
+            "start_time": row["start_time"],
+            "end_time": row["end_time"],
+            "location": total_locations,
+        })
+    
+    return jsonify(lob_data)
+
+
+@app.route('/lob')
+@login_required
+@check_requirements(has_locations)
+@check_requirements(has_tasks)
+def lob():
+    return render_template('lob.html')
+
+

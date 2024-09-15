@@ -4,17 +4,57 @@
     Index
 {% endblock %}
 
+{% block tooltip %}
+    On the index page, you can create or select projects to begin scheduling and managing tasks and timelines.
+    Most other routes become accessible after selecting a project.
+{% endblock %}
+
 {% block main %}
+<div class="d-flex justify-content-center align-items-center">
+    <div>
+        {% if selected_project %}
+            <h3 class="text-center">Selected Project: {{ selected_project }}</h3>
+        {% else %}
+            <h3 class="text-center">Select a Project to Continue</h3>
+        {% endif %}
+    </div>
+</div>
 
+<div class="container mt-5"></div>
+    <h5 style="padding-bottom: 15px;">With Hardplan you will be able to schedule your projects using both Critical Path Method and Line of Balance</h5>
 
+    <h4 class="text-center">Getting Started</h4>
+    <p>Follow these steps to efficiently use the project management features:</p>
 
-{% if selected_project %}
-    <h3>Project: {{ selected_project }}</h3>
-
-{% else %}
-
-    <h3>Select a Project to Continue</h3>
-
-{% endif %}
-
+    <ul class="list-group">
+        <li class="list-group-item">
+            <strong>Create or Select a Project:</strong> 
+            Start by creating a new project or selecting an existing one from the top bar. Once a project is selected, additional features like locations, tasks, and scheduling become available.
+        </li>
+        <li class="list-group-item">
+            <strong>Input Locations:</strong> 
+            Use the <a href="/location" class="text-decoration-none">Location</a> page to input repeated locations for your project. These could be floors for a vertical project or road sections for a horizontal project.
+        </li>
+        <li class="list-group-item">
+            <strong>Add Project Tasks:</strong> 
+            On the <a href="/task" class="text-decoration-none">Task</a> page, define repetitive tasks and assign logical predecessors to each task. This will help calculate timelines based on dependencies.
+        </li>
+        <li class="list-group-item">
+            <strong>View Critical Path Attributes:</strong> 
+            Check the <a href="/wbs" class="text-decoration-none">WBS</a> page to view calculated CPM (Critical Path Method) attributes like Earliest Start (ES), Earliest Finish (EF), and task slack. This table helps identify which tasks are critical to the project's timeline.
+        </li>
+        <li class="list-group-item">
+            <strong>Visualize Tasks with Gantt Charts:</strong> 
+            Use the <a href="/gantt" class="text-decoration-none">Gantt</a> page to visualize your schedule for tasks at a single location. This chart helps track task progress and deadlines.
+        </li>
+        <li class="list-group-item">
+            <strong>Gantt Chart for All Locations:</strong> 
+            The <a href="/gantt-total" class="text-decoration-none">Gantt Total</a> page provides a comprehensive view of critical tasks repeated across all locations.
+        </li>
+        <li class="list-group-item">
+            <strong>Explore Line of Balance:</strong> 
+            The <a href="/lob" class="text-decoration-none">Line of Balance</a> page shows how tasks flow across all locations, ensuring that tasks start in a sequence that avoids overlap.
+        </li>
+    </ul>
+</div>
 {% endblock %}

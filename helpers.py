@@ -1,7 +1,6 @@
 import sqlite3
-import time
 from datetime import timedelta, datetime
-from flask import g, session, redirect, url_for
+from flask import g, session, redirect, url_for, flash
 from functools import wraps
 from collections import defaultdict, deque
 
@@ -27,6 +26,19 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+def check_requirements(requirement_func):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not requirement_func():  # Call the passed requirement function
+                flash("Please complete all required steps before accessing this page.")
+                return redirect(url_for("index"))  # Redirect to safe route
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+
 # Fetch all projects for the logged-in user
 def get_user_projects():
     cur = get_db().cursor()
@@ -36,6 +48,51 @@ def get_user_projects():
 
     # Return project names as a list
     return [project["name"] for project in projects]
+
+
+def has_tasks():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    tasks = cur.execute('SELECT COUNT(*) FROM wbs WHERE project_id = ?', (project_id,)).fetchone()
+    return tasks[0] > 0
+
+
+def has_locations():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    locations = cur.execute('SELECT COUNT(*) FROM lbs WHERE project_id = ?', (project_id,)).fetchone()
+    return locations[0] > 0
+
+def get_mermaid():
+    cur = get_db().cursor()
+    project_id = session.get("project_id")
+    calculate_date_cpm()
+
+    data_wbs = cur.execute(
+        """
+        SELECT wbs.display_id, wbs.task, wbs.duration, wbs.ES, wbs.EF, wbs.critical,
+        GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
+        FROM wbs
+        LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
+        WHERE wbs.project_id = ?
+        GROUP BY wbs.id
+        ORDER BY wbs.display_id DESC
+        """,
+        (project_id,)
+    ).fetchall()
+
+    mermaid_code = 'graph LR\n'
+    for task in data_wbs:
+        task_id = task['display_id']
+        task_name = task['task']
+        mermaid_code += f'    {task_id}["{task_name}"]\n'
+        predecessors = task["predecessors"].split(",") if task["predecessors"] else []
+        for pred in predecessors:
+            if pred:
+                mermaid_code += f'    {pred} --> {task_id}\n'
+    
+    return mermaid_code
+
 
 # Fetch all locations for the selected project
 def get_project_locations():
@@ -257,6 +314,7 @@ def calculate_lob():
         """
         SELECT id, display_id, location FROM lbs
         WHERE project_id = ?
+        ORDER BY display_id
         """,
         (project_id,)
     ).fetchall()
@@ -361,7 +419,7 @@ def calculate_lob():
 
 
 def topological_sort(tasks):
-    # Construir o grafo
+    # Build the graph
     in_degree = defaultdict(int)
     graph = defaultdict(list)
     
@@ -374,7 +432,7 @@ def topological_sort(tasks):
         if task["display_id"] not in in_degree:
             in_degree[task["display_id"]] = 0
 
-    # Fila para armazenar nós com grau de entrada zero
+    # Queue to store nodes with zero in_degree
     zero_in_degree = deque([task["display_id"] for task in tasks if in_degree[task["display_id"]] == 0])
 
     sorted_tasks = []
@@ -396,7 +454,7 @@ def topological_sort(tasks):
     return sorted_tasks
 
 
-def calculate_dates():
+def calculate_lob_total():
     cur = get_db().cursor()
     project_id = session.get("project_id")
 
@@ -422,7 +480,7 @@ def calculate_dates():
     ).fetchall()
 
     # Convert to list of dictionaries for processing
-    tasks = [
+    sorted_tasks = [
         {
             "id": row["id"],
             "display_id": row["display_id"],
@@ -436,13 +494,7 @@ def calculate_dates():
     ]
 
     # Convert list of tasks to a dictionary for quick lookup
-    task_dict = {task["display_id"]: task for task in tasks}
-
-    # Topological Sort to get processing order
-    sorted_display_ids = topological_sort(tasks)
-    
-    # Create a mapping of display_id to sorted tasks
-    sorted_tasks = [task_dict[display_id] for display_id in sorted_display_ids]
+    task_dict = {task["display_id"]: task for task in sorted_tasks}
 
     for task in sorted_tasks:
         predecessors = task["predecessors"]
@@ -477,7 +529,7 @@ def calculate_dates():
                 task["end_time"] = max_pred_end + timedelta(days=task["duration"])
                 task["start_time"] = task["end_time"] - timedelta(days=task["duration"] * (locations_count - 1))
 
-    for task in tasks:
+    for task in sorted_tasks:
         # Update the WBS table with calculated start and end times
         cur.execute(
             "UPDATE wbs SET start_time = ?, end_time = ? WHERE id = ?", 

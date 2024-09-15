@@ -4,10 +4,40 @@
     Task
 {% endblock %}
 
+{% block tooltip %}
+    Enter the repetitive tasks for your project here.
+    Make sure to logically assign one or more predecessors to each task, as this will influence the project timeline and dependencies. 
+{% endblock %}
+
+
 {% block main %}
 <div class="container">
     <h3>Create your Work Breakdown Structure </h3>
-
+    
+    {% if ready == True %}
+        <script type="module">
+            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+            mermaid.initialize({startOnLoad:true});
+        </script>
+            <div class="card">
+                <div class="card-body">
+                    <h5>Typical Floor Flowchart</h5>
+                    <hr>
+                    <div class="mermaid">
+                        {{ mermaid_code|safe }}
+                    </div>
+                </div>
+            </div>
+        <script>
+            fetch('/gantt-data')
+                .then(response => response.json())
+                .then(data => {
+                    const mermaidCode = mermaid.mermaid_code;
+                    document.querySelector('.mermaid').innerHTML = mermaidCode;
+                    mermaid.init(); // Reinitialize mermaid after content change
+                });
+        </script>
+    {% endif %}
     <!-- Table to display added tasks -->
     <table class="table table-striped" id="wbs-table">
         <thead>

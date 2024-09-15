@@ -1,0 +1,26 @@
+{% extends "layout2.html" %}
+
+{% block title %}
+    Index
+{% endblock %}
+
+{% block main %}
+
+<div class="container d-flex justify-content-center">
+    <div class="border border-primary rounded p-4" style="max-width: 400px; box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);">
+
+        <form action="/create-project" method="post" style="padding-bottom: 10px;">
+            <div class="mb-3">
+                <label for="project" class="form-label">Create a new Project</label>
+                <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="project" placeholder="Project Name" type="text">
+            </div>
+            <div class="mb-3">
+                <label for="project" class="form-label">Add Start Date</label>
+                <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="start_date" placeholder="Start Date" type="date">
+            </div>
+            <button class="btn btn-primary w-50" type="submit">Submit</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

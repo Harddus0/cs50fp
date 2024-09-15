@@ -1,14 +1,18 @@
 {% extends "layout.html" %}
 
 {% block title %}
-    Gantt Chart
+    Gantt Total
+{% endblock %}
+
+{% block tooltip %}
+    This chart provides a Gantt view of the Line of Balance, displaying critical tasks repeated across all locations.
+    It offers a visual representation of how tasks span different sections or floors of the project.
 {% endblock %}
 
 {% block main %}
-
 <div class="card">
     <div class="card-body">
-        <h5>Gantt Chart</h5>
+        <h5>Gantt Chart Total</h5>
         <hr>
         <div id="ganttChart" style="width: 100%; height: 100%;"></div>
     </div>

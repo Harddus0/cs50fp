@@ -8,12 +8,12 @@
         <!-- Include Bootstrap CSS http://getbootstrap.com/docs/5.3/ -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+        
+        <!-- Link to bootstrap icons-->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css">
 
         <!-- Link to css file -->
         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-        
-        <!-- chart.js-->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         
         <!-- plotly.js -->
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -39,9 +39,9 @@
                     <ul class="navbar-nav ms-auto mt-2">
 
                         {% if session["user_id"] %}
-                            <li class="nav-item active"><a href="/project" class="nav-link">Project</a></li>
-                            <li class="nav-item active"><a href="/logout" class="nav-link">Log Out</a></li>
-                            
+                            <li class="nav-item active"><a href="/create-project" class="nav-link">Create Project</a></li>
+                            <li class="nav-item active"><a href="/select-project" class="nav-link">Select Project</a></li>
+                            <li class="nav-item active"><a href="/logout" class="nav-link">Log Out</a></li>                            
                         {% else %}
                             <li class="nav-item active"><a href="/login" class="nav-link">Login</a></li>
                             <li class="nav-item active"><a href="/register" class="nav-link">Register</a></li>
@@ -60,23 +60,23 @@
                     <nav class="col-md-2 d-none d-md-block sidebar" style="min-height: 100vh; background-color: #E1E2E1;">
                         <div class="position-sticky">
                             <ul class="nav flex-column">
-                                <li class="nav-item">
+                                <li class="nav-item active">
                                     <a class="nav-link text-dark" href="/location">Locations</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item active">
                                     <a class="nav-link text-dark" href="/task">Activities</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item active">
                                     <a class="nav-link text-dark" href="/wbs">WBS</a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item active">
                                     <a class="nav-link text-dark" href="/gantt">Gantt Chart</a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link text-dark" href="/lob">Line of Balance</a>
-                                </li>
-                                <li class="nav-item">
+                                <li class="nav-item active">
                                     <a class="nav-link text-dark" href="/gantt-total">Gantt Total</a>
+                                </li>
+                                <li class="nav-item active">
+                                    <a class="nav-link text-dark" href="/lob">Line of Balance</a>
                                 </li>
                                 <!-- Add more navigation links as needed -->
                             </ul>
@@ -85,8 +85,7 @@
                 {% endif %}
                 
                 <!-- Main content -->
-                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-5 text-center">
-                    
+                <main class="col-md{{ '9 ms-sm-auto col-lg-10' if session.get('project_id') else '12' }} px-md-4 py-5 text-center">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         <div class="container rounded text-center" style="background-color: #99B3CC">
@@ -99,12 +98,21 @@
                         </div>
                     {% endif %}
                 {% endwith %}
-
+                    <!-- Question Mark Icon with Tooltip -->
+                    <div class="help-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="{% block tooltip %}{% endblock %}">
+                        <i class="bi bi-patch-question" style="font-size: 24px;"></i>
+                    </div>
                     {% block main %}{% endblock %}
                 </main>
             </div>
         </div>
-
+        <script>
+            // Initialize all tooltips on the page
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            })
+        </script>
 
         <!-- Include Bootstrap JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>

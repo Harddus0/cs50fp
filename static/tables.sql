@@ -60,23 +60,3 @@ CREATE TABLE wbs_lbs (
     FOREIGN KEY (lbs_id) REFERENCES lbs(id) ON DELETE CASCADE,
     UNIQUE (wbs_id, lbs_id)
 );
-
-CREATE TABLE resources (
-    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    name TEXT NOT NULL,  -- Name of the resource (e.g., labor, material)
-    type TEXT NOT NULL   -- Type of resource (e.g., human, material)
-);
-
-CREATE TABLE wbs_resources (
-    wbs_id INTEGER NOT NULL,
-    resource_id INTEGER NOT NULL,
-    quantity INTEGER NOT NULL,  -- Quantity of the resource required
-    PRIMARY KEY (wbs_id, resource_id),
-    FOREIGN KEY (wbs_id) REFERENCES wbs(id) ON DELETE CASCADE,
-    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
-);
-
--- queue to select data for lob chart
-SELECT wbs.task, wbs.display_id, wbs_lbs.start_time, wbs_lbs.end_time, lbs.location FROM wbs_lbs
-JOIN wbs ON wbs.id = wbs_lbs.wbs_id
-JOIN lbs ON lbs.id = wbs_lbs.lbs_id;

@@ -56,3 +56,17 @@ body {
   align-items: center;      /* Centers vertically */
   height: 100%;             /* Full height for vertical centering (optional) */
 }
+
+.sidebar .nav-link:hover {
+    background-color: #A020F0;
+    color: #ffffff !important;
+    border-radius: 5px;
+}
+
+.help-icon {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 1050; /* Ensure it appears above other elements */
+  cursor: pointer;
+}

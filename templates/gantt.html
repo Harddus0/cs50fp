@@ -4,8 +4,12 @@
     Gantt Chart
 {% endblock %}
 
-{% block main %}
+{% block tooltip %}
+    The Gantt chart visualizes the schedule for tasks at a single location.
+    It's commonly used with the Critical Path Method (CPM) to highlight tasks that must stay on track to avoid delaying the entire project, also known as critical tasks.
+{% endblock %}
 
+{% block main %}
 <div class="card">
     <div class="card-body">
         <h5>Gantt Chart</h5>
@@ -61,5 +65,5 @@
 });
 
 </script>
-
+<p style="padding-top: 10px;">Critical tasks are <span style="color: #F8888E; font-weight: bold;">Red</span> and Non-Critical are <span style="color: #2876B2; font-weight: bold;">Blue</span></p>
 {% endblock %}

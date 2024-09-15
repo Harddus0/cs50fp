@@ -3,11 +3,15 @@
 {% block title %}
     WBS
 {% endblock %}
+    
+{% block tooltip %}
+    This table shows the calculated attributes from the Critical Path Method for the repetitive tasks, assuming only a single location.
+    It includes Earliest Start (ES), Earliest Finish (EF), Slack, and Critical tasks, which help determine project bottlenecks.
+{% endblock %}
 
 {% block main %}
 <div class="container">
     <h3>Work Breakdown Structure </h3>
-
     <!-- Table to display added tasks -->
     <table class="table table-striped" id="wbs-table">
         <thead>

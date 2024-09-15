@@ -35,12 +35,12 @@
                     <ul class="navbar-nav ms-auto mt-2">
 
                         {% if session["user_id"] %}
-                            <li class="nav-item active"><a href="/project" class="nav-link">Project</a></li>
-                            <li class="nav-item active"><a href="/logout" class="nav-link">Log Out</a></li>
-                            
+                        <li class="nav-item active"><a href="/create-project" class="nav-link">Create Project</a></li>
+                        <li class="nav-item active"><a href="/select-project" class="nav-link">Select Project</a></li>
+                        <li class="nav-item active"><a href="/logout" class="nav-link">Log Out</a></li>                            
                         {% else %}
-                            <li class="nav-item active"><a href="/login" class="nav-link">Login</a></li>
-                            <li class="nav-item active"><a href="/register" class="nav-link">Register</a></li>
+                        <li class="nav-item active"><a href="/login" class="nav-link">Login</a></li>
+                        <li class="nav-item active"><a href="/register" class="nav-link">Register</a></li>
                         {% endif %}
                     </ul>
                 </div>
