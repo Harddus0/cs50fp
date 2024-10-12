@@ -298,7 +298,7 @@ def calculate_lob():
     # Fetch WBS table with critical tasks and predecessors
     wbs_table = cur.execute(
         """
-        SELECT id, wbs.display_id, wbs.task, wbs.duration,
+        SELECT id, wbs.display_id, wbs.task, wbs.duration, wbs.critical,
         GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
         FROM wbs
         LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
@@ -312,7 +312,7 @@ def calculate_lob():
     # Fetch LBS table (locations)
     locations = cur.execute(
         """
-        SELECT id, display_id, location FROM lbs
+        SELECT id, location FROM lbs
         WHERE project_id = ?
         ORDER BY display_id
         """,
@@ -325,14 +325,16 @@ def calculate_lob():
     for row in wbs_table:
         task = {
             "id": row["id"],
+            "display_id": row["display_id"],
             "duration": row["duration"],
             "predecessors": row["predecessors"].split(",") if row["predecessors"] else [],
+            "critical": row["critical"],
             "locations": [
                 {"location_id": loc["id"], "start_time": None, "end_time": None} for loc in locations
             ]
         }
         tasks.append(task)
-        task_dict[task["id"]] = task  # Map task by its id for easy lookup
+        task_dict[task["display_id"]] = task  # Map task by its id for easy lookup
         
 
     first_end = 0
@@ -347,8 +349,12 @@ def calculate_lob():
         for predecessor_id in task["predecessors"]:
             predecessor_id = int(predecessor_id)  # Ensure it's an integer
             predecessor = task_dict.get(predecessor_id)  # Look up the predecessor task
-            if predecessor:
-                max_pred_dur = max(max_pred_dur, predecessor["duration"])
+            try:
+                if predecessor["critical"] == "1":
+                    max_pred_dur = max(max_pred_dur, predecessor["duration"])
+            except TypeError:
+                pass
+        # max_pred_dur = max((task_dict[int(pred_id)]["duration"] for pred_id in task["predecessors"]), default=0)
 
         # Check if it's first task or if task is longer than predecessor
         if not task["predecessors"] or task["duration"] > max_pred_dur:
@@ -432,7 +438,7 @@ def calculate_lob_total():
     # Fetch WBS table with tasks and possible predecessors
     wbs_table = cur.execute(
         """
-        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time, 
+        SELECT wbs.id, wbs.display_id, wbs.task, wbs.duration, wbs.start_time, wbs.end_time, wbs.critical,
         GROUP_CONCAT(wbs_predecessors.predecessor_id) AS predecessors
         FROM wbs
         LEFT JOIN wbs_predecessors ON wbs.id = wbs_predecessors.task_id
@@ -452,7 +458,8 @@ def calculate_lob_total():
             "duration": row["duration"],
             "predecessors": row["predecessors"].split(",") if row["predecessors"] else [],
             "start_time": None,
-            "end_time": None
+            "end_time": None,
+            "critical": row["critical"]
         }
         for row in wbs_table
     ]
@@ -466,7 +473,7 @@ def calculate_lob_total():
         # Set start time as project_start_date for tasks with no predecessors
         if not predecessors:
             task["start_time"] = project_start_date
-            task["end_time"] = task["start_time"] + timedelta(days=task["duration"] * locations_count)
+            task["end_time"] = task["start_time"] + timedelta(days=task["duration"] * (locations_count - 1))
         else:
             # get task predecessor of highest duration, extracting both the highest duration (max_dur) and the predecessor end_date
             max_pred_dur = 0
@@ -474,8 +481,12 @@ def calculate_lob_total():
             max_pred_start = project_start_date
 
             for predecessor_id in predecessors:
+
                 predecessor_id = int(predecessor_id)  # Ensure it's an integer
                 predecessor = task_dict.get(predecessor_id)  # Look up the predecessor task
+
+                if predecessor["critical"] == "0":
+                    continue
 
                 if predecessor["end_time"]:
                     max_pred_end = max(max_pred_end, predecessor["end_time"])
@@ -487,10 +498,10 @@ def calculate_lob_total():
             if max_pred_dur <= task["duration"]:
                 # Case where predecessor's duration is smaller or equal to current task's duration
                 task["start_time"] = max_pred_start + timedelta(days=max_pred_dur)
-                task["end_time"] = task["start_time"] + timedelta(days=task["duration"] * locations_count)
+                task["end_time"] = task["start_time"] + timedelta(days=task["duration"] * (locations_count - 1))
             else:
                 # Case where predecessor's duration is larger than the current task's duration
-                task["end_time"] = max_pred_end + timedelta(days=task["duration"])
+                task["end_time"] = max_pred_end + timedelta(days=max_pred_dur)
                 task["start_time"] = task["end_time"] - timedelta(days=task["duration"] * (locations_count - 1))
 
     for task in sorted_tasks:

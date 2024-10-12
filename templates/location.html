@@ -6,48 +6,54 @@
 
 {% block tooltip %}
     Insert here the repeated locations for your construction project.
-    For a vertical project like a building, these could be Typical Floors.
-    For horizontal projects, such as roads, they might be road sections or phases.
+    For vertical projects, these could be floors; for horizontal projects, road sections.
 {% endblock %}
 
 {% block main %}
 
-    <div class="container"></div>
-    <h3>Create your Location list</h3>
+<div class="container"></div>
+<h3>Create your Location List</h3>
 
-    <!-- Table to display added locations -->
-    <table class="table table-striped" id="locations-table">
-        <thead>
-            <tr>
-                <Th>id</Th>
-                <th>Location</th>
-                <th></th> <!-- Add/Delete column -->
-            </tr>
-        </thead>
-        
-        <tbody id="locations-tbody">
-            <tr>
+<!-- Table to display added locations -->
+<table class="table table-striped" id="locations-table">
+    <thead>
+        <tr>
+            <th>id</th>
+            <th>Location</th>
+            <th>Actions</th> <!-- Column for buttons -->
+        </tr>
+    </thead>
+
+    <tbody id="locations-tbody">
+        <tr>
+            <form method="POST" action="/location">
+                <td></td> <!-- id takes no input -->
+                <td style="padding: 15px;">
+                    <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="location" placeholder="Location Name" type="text">
+                </td>
+                <td style="padding: 15px;">
+                    <!-- flexbox to position buttons side-by-side -->
+                    <div class="d-flex justify-content-center">
+                        <button type="submit" name="add_next" value="true" class="btn btn-secondary mx-1"><strong>+</strong></button>
+                        <button class="btn btn-primary mx-1" type="submit">Add</button>
+                    </div>
+                </td>
+            </form>
+        </tr>
+        {% for row in lbs_table %}
+        <tr>
+            <td>{{ row["display_id"] }}</td>
+            <td>{{ row["location"] }}</td>
+            <td>
                 <form method="POST" action="/location">
-                    <td></td> <!-- id takes no input -->
-                    <td style="padding: 15px;"><input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="location" placeholder="Location Name" type="text"></td>
-                    <td style="padding: 15px;"><button class="btn btn-primary mx-auto w-auto" type="submit">Add</button></td>
+                    <input type="hidden" name="id" value="{{ row['id'] }}">
+                    <button class="btn btn-danger mx-auto w-auto" type="submit">Delete</button>
                 </form>
-            </tr>
-            {% for row in lbs_table %}
-                <tr>
-                    <td>{{ row["display_id"] }}</td>
-                    <td>{{ row["location"] }}</td>
-                    <td>
-                        {% if loop.index == 1 %}
-                        <form method="POST" action="/location">
-                            <input type="hidden" name="id" value="{{ row['id'] }}">
-                            <button class="btn btn-danger mx-auto w-auto" type="submit">Delete</button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
 
 {% endblock %}

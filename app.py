@@ -1,6 +1,7 @@
 from helpers import get_db, close_db, login_required, get_user_projects, get_project_locations, get_project_wbs, calculate_lob, calculate_date_cpm, calculate_lob_total, check_requirements, has_locations, has_tasks, get_mermaid
 from flask import Flask, flash, redirect, render_template, request, session, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
+import re
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
@@ -154,39 +155,57 @@ def register():
 
 
 @app.route("/location", methods=["GET", "POST"])
-@login_required  # Protect this route so only logged-in users can access it
+@login_required
 def location():
-    
     cur = get_db().cursor()
+    project_id = session.get("project_id")
 
     if request.method == "POST":
-        
-        project_id = session.get("project_id")
+        # Check if the button for 'add next location' is clicked
+        add_next = request.form.get("add_next")
         location = request.form.get("location")
         delete_id = request.form.get("id")
 
+        # Handle deletion
         if delete_id:
-            flash("Successfully deleted", "success")
             cur.execute("DELETE FROM lbs WHERE id = ?", (delete_id,))
             g.db.commit()
+            flash("Successfully deleted", "success")
             return render_template("location.html", lbs_table=get_project_locations())
 
-        if not location:
-            flash("location required", "error")
-            return render_template("location.html", lbs_table=get_project_locations())
-        
-        max_id = cur.execute("SELECT IFNULL(MAX(display_id),0) FROM lbs WHERE project_id = ?", (project_id,)).fetchone()[0]
+        # If "Add Next Location" button is clicked
+        if add_next:
+            last_location = cur.execute("SELECT location FROM lbs WHERE project_id = ? ORDER BY display_id DESC LIMIT 1", (project_id,)).fetchone()
+            last_location = last_location[0] if last_location else "Floor 0"
 
-        try:
+            # Extract number and increment
+            
+            match = re.match(r"(\D*)(\d+)$", last_location)
+            if match:
+                prefix, number = match.groups()
+                next_location = f"{prefix}{int(number) + 1}"
+            else:
+                next_location = "Floor 1"
+
+            # Insert new location
+            max_id = cur.execute("SELECT IFNULL(MAX(display_id), 0) FROM lbs WHERE project_id = ?", (project_id,)).fetchone()[0]
+            cur.execute("INSERT INTO lbs (display_id, project_id, location) VALUES (?, ?, ?)", (max_id + 1, project_id, next_location))
+            g.db.commit()
+
+            return render_template("location.html", lbs_table=get_project_locations())
+
+        # Handle standard location input (not auto-increment)
+        if location:
+            max_id = cur.execute("SELECT IFNULL(MAX(display_id), 0) FROM lbs WHERE project_id = ?", (project_id,)).fetchone()[0]
             cur.execute("INSERT INTO lbs (display_id, project_id, location) VALUES (?, ?, ?)", (max_id + 1, project_id, location))
             g.db.commit()
-        except:
-            flash("Please fill in the required fields", "error")
             return render_template("location.html", lbs_table=get_project_locations())
 
+        flash("Location required", "error")
         return render_template("location.html", lbs_table=get_project_locations())
 
     return render_template("location.html", lbs_table=get_project_locations())
+
 
 
 @app.route("/task", methods=["GET", "POST"])
